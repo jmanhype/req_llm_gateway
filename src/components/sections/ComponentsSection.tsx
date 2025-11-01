@@ -1,3 +1,4 @@
+import React from 'react'
 import { ComponentCard } from '@/components/ComponentCard'
 import { components } from '@/lib/spec-data'
 

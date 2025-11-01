@@ -1,3 +1,4 @@
+import React from 'react'
 import { CodeBlock } from '@/components/CodeBlock'
 import { Card } from '@/components/ui/card'
 import { configExample, routerExample } from '@/lib/spec-data'

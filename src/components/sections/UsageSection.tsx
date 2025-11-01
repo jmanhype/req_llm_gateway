@@ -1,3 +1,4 @@
+import React from 'react'
 import { CodeBlock } from '@/components/CodeBlock'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { curlExample, pythonExample, elixirExample } from '@/lib/spec-data'

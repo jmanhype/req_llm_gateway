@@ -1,7 +1,7 @@
+import React, { useState } from 'react'
 import { Card } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Copy, Check } from '@phosphor-icons/react'
-import { useState } from 'react'
 import { toast } from 'sonner'
 
 interface CodeBlockProps {

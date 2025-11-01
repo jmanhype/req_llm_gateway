@@ -1,8 +1,8 @@
+import React, { useState } from 'react'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { useState } from 'react'
 import { parseModelFormat } from '@/lib/spec-data'
 import { Check, Warning } from '@phosphor-icons/react'
 
