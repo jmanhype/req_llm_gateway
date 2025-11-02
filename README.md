@@ -12,10 +12,11 @@ That's it. You now have a production-ready LLM gateway.
 ## What You Get
 
 - ✅ **OpenAI-compatible endpoint** - Works with existing SDKs (Python, JS, curl)
-- ✅ **Multi-provider routing** - `openai:gpt-4`, `anthropic:claude-3-sonnet`
+- ✅ **45+ providers, 665+ models** - Powered by ReqLLM
+- ✅ **Multi-provider routing** - `openai:gpt-4`, `anthropic:claude-3-sonnet`, `google:gemini-pro`
 - ✅ **Built-in telemetry** - Emit events for observability
 - ✅ **Usage tracking** - ETS-backed stats (no database needed)
-- ✅ **Cost tracking** - Know what you're spending
+- ✅ **Automatic cost tracking** - ReqLLM knows pricing for all models
 - ✅ **LiveDashboard** - See usage stats at `/dashboard/rec_llm`
 
 ## Installation
@@ -34,13 +35,23 @@ end
 
 ### 1. Configure API Keys
 
+ReqLLM automatically picks up API keys from environment variables:
+
+```bash
+export OPENAI_API_KEY="sk-..."
+export ANTHROPIC_API_KEY="sk-ant-..."
+export GOOGLE_API_KEY="..."
+# ... and so on for other providers
+```
+
+Or configure explicitly:
+
 ```elixir
 # config/config.exs
-config :rec_llm_gateway,
-  api_keys: %{
-    "openai" => System.get_env("OPENAI_API_KEY"),
-    "anthropic" => System.get_env("ANTHROPIC_API_KEY")
-  }
+config :req_llm,
+  openai_api_key: System.get_env("OPENAI_API_KEY"),
+  anthropic_api_key: System.get_env("ANTHROPIC_API_KEY"),
+  google_api_key: System.get_env("GOOGLE_API_KEY")
 ```
 
 ### 2. Add to Router
@@ -71,16 +82,26 @@ curl http://localhost:4000/v1/chat/completions \
 
 ## Model Routing
 
-Specify provider explicitly:
+RecLLMGateway supports 45+ providers via ReqLLM:
+
+**Specify provider explicitly:**
 ```json
 {"model": "openai:gpt-4"}
-{"model": "anthropic:claude-3-sonnet-20240229"}
+{"model": "anthropic:claude-3-opus-20240229"}
+{"model": "google:gemini-1.5-pro"}
+{"model": "groq:llama3-70b"}
+{"model": "xai:grok-beta"}
 ```
 
-Or use default provider:
+**Or use default provider:**
 ```json
 {"model": "gpt-4"}  // Uses default_provider from config
 ```
+
+**Supported providers include:**
+- OpenAI, Anthropic, Google, AWS Bedrock
+- Groq, xAI, Cerebras, OpenRouter
+- And 35+ more!
 
 ## Response Format
 
@@ -116,6 +137,7 @@ response = client.chat.completions.create(
 ## Configuration Options
 
 ```elixir
+# RecLLMGateway config
 config :rec_llm_gateway,
   # Default provider when model has no prefix (default: "openai")
   default_provider: "openai",
@@ -124,13 +146,14 @@ config :rec_llm_gateway,
   include_extensions: true,
 
   # Optional gateway authentication
-  api_key: System.get_env("GATEWAY_API_KEY"),
+  api_key: System.get_env("GATEWAY_API_KEY")
 
-  # Provider API keys
-  api_keys: %{
-    "openai" => System.get_env("OPENAI_API_KEY"),
-    "anthropic" => System.get_env("ANTHROPIC_API_KEY")
-  }
+# ReqLLM provider API keys
+config :req_llm,
+  openai_api_key: System.get_env("OPENAI_API_KEY"),
+  anthropic_api_key: System.get_env("ANTHROPIC_API_KEY"),
+  google_api_key: System.get_env("GOOGLE_API_KEY")
+  # ... add keys for other providers as needed
 ```
 
 ## Usage Tracking
