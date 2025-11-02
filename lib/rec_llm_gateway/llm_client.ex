@@ -176,26 +176,48 @@ defmodule RecLLMGateway.LLMClient do
     ])
 
     # Fix: Convert string keys to atoms for custom parameters
+    # Use a safer approach that doesn't drop all params on error
     if map_size(custom_params) > 0 do
       custom_opts =
         custom_params
-        |> Enum.map(fn {key, value} ->
-          # Safely convert string keys to atoms
-          atom_key = if is_binary(key), do: String.to_existing_atom(key), else: key
-          {atom_key, value}
+        |> Enum.reduce([], fn {key, value}, acc ->
+          # Skip nil values
+          if is_nil(value) do
+            acc
+          else
+            # Safely convert string keys to atoms
+            case safe_to_atom(key) do
+              {:ok, atom_key} -> [{atom_key, value} | acc]
+              :error ->
+                Logger.warn("Skipping custom parameter with invalid key: #{inspect(key)}")
+                acc
+            end
+          end
         end)
-        |> Enum.filter(fn {_k, v} -> not is_nil(v) end)
 
       Keyword.merge(opts, custom_opts)
     else
       opts
     end
-  rescue
-    ArgumentError ->
-      # If atom doesn't exist, just return opts without custom params
-      Logger.warning("Skipping custom parameters with non-existent atom keys")
-      opts
   end
+
+  # Safely convert string to existing atom, or create new atom if reasonable
+  defp safe_to_atom(key) when is_atom(key), do: {:ok, key}
+  defp safe_to_atom(key) when is_binary(key) do
+    # Try existing atom first
+    try do
+      {:ok, String.to_existing_atom(key)}
+    rescue
+      ArgumentError ->
+        # Only create new atoms for reasonable key names (alphanumeric + underscore)
+        if String.match?(key, ~r/^[a-z_][a-z0-9_]*$/i) and byte_size(key) < 100 do
+          {:ok, String.to_atom(key)}
+        else
+          :error
+        end
+    end
+  end
+  defp safe_to_atom(_), do: :error
 
   defp maybe_add_option(opts, _key, nil), do: opts
   defp maybe_add_option(opts, key, value), do: Keyword.put(opts, key, value)
@@ -231,7 +253,7 @@ defmodule RecLLMGateway.LLMClient do
 
       # Fallback: Try to extract any text-like field
       other ->
-        Logger.warning("Unexpected response format from #{provider}",
+        Logger.warn("Unexpected response format from #{provider}",
           provider: provider,
           model: model,
           response_keys: Map.keys(other)
@@ -418,7 +440,7 @@ defmodule RecLLMGateway.LLMClient do
 
     # Log warning if we encountered non-text content blocks
     if unhandled != [] do
-      Logger.warning("Encountered non-text content blocks",
+      Logger.warn("Encountered non-text content blocks",
         unhandled_types: Enum.map(unhandled, &Map.get(&1, "type", "unknown"))
       )
     end
@@ -442,8 +464,8 @@ defmodule RecLLMGateway.LLMClient do
 
   # Transform ReqLLM errors to OpenAI-compatible format
   # Enhanced to preserve error types from ReqLLM.Error structs
-  defp transform_error(%{__struct__: struct_name, type: type, message: message}, provider, model)
-      when struct_name == ReqLLM.Error do
+  # Use idiomatic struct pattern matching
+  defp transform_error(%ReqLLM.Error{type: type, message: message}, provider, model) do
     Logger.error("ReqLLM error",
       provider: provider,
       model: model,
@@ -496,7 +518,7 @@ defmodule RecLLMGateway.LLMClient do
   end
 
   # Helper to get error type for logging
-  defp error_type(%{__struct__: ReqLLM.Error, type: type}), do: type
+  defp error_type(%ReqLLM.Error{type: type}), do: type
   defp error_type(%{type: type}), do: type
   defp error_type(_), do: :unknown
 
