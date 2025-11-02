@@ -1,15 +1,43 @@
 defmodule RecLLMGateway.MixProject do
   use Mix.Project
 
+  @version "0.1.0"
+  @source_url "https://github.com/jmanhype/recllmgateway"
+
   def project do
     [
       app: :rec_llm_gateway,
-      version: "0.1.0",
+      version: @version,
       elixir: "~> 1.14",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       elixirc_paths: elixirc_paths(Mix.env()),
-      aliases: aliases()
+      aliases: aliases(),
+
+      # Docs
+      name: "RecLLMGateway",
+      description: "OpenAI-compatible LLM proxy with telemetry and multi-provider routing",
+      source_url: @source_url,
+      homepage_url: @source_url,
+      docs: docs(),
+      package: package(),
+
+      # Testing
+      test_coverage: [tool: ExCoveralls],
+      preferred_cli_env: [
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.post": :test,
+        "coveralls.html": :test,
+        "coveralls.github": :test
+      ],
+
+      # Dialyzer
+      dialyzer: [
+        plt_file: {:no_warn, "priv/plts/dialyzer.plt"},
+        plt_add_apps: [:ex_unit, :mix],
+        flags: [:error_handling, :underspecs]
+      ]
     ]
   end
 
@@ -25,6 +53,7 @@ defmodule RecLLMGateway.MixProject do
 
   defp deps do
     [
+      # Runtime dependencies
       {:plug, "~> 1.14"},
       {:jason, "~> 1.4"},
       {:plug_cowboy, "~> 2.6"},
@@ -35,15 +64,67 @@ defmodule RecLLMGateway.MixProject do
       {:httpoison, "~> 2.0"},
       {:decimal, "~> 2.1"},
 
+      # Development dependencies
+      {:ex_doc, "~> 0.31", only: :dev, runtime: false},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+      {:excoveralls, "~> 0.18", only: :test},
+
       # Test dependencies
-      {:mox, "~> 1.0", only: :test},
-      {:ex_doc, "~> 0.29", only: :dev, runtime: false}
+      {:mox, "~> 1.0", only: :test}
     ]
   end
 
   defp aliases do
     [
-      test: "test --no-start"
+      test: "test --no-start",
+      quality: ["format --check-formatted", "credo --strict", "dialyzer"],
+      "quality.fix": ["format", "credo --strict --format=oneline"]
+    ]
+  end
+
+  defp docs do
+    [
+      main: "RecLLMGateway",
+      source_ref: "v#{@version}",
+      source_url: @source_url,
+      extras: [
+        "README.md",
+        "CHANGELOG.md": [title: "Changelog"],
+        "CONTRIBUTING.md": [title: "Contributing"],
+        "LICENSE": [title: "License"]
+      ],
+      groups_for_modules: [
+        "Core Components": [
+          RecLLMGateway,
+          RecLLMGateway.Plug,
+          RecLLMGateway.LLMClient
+        ],
+        "Utilities": [
+          RecLLMGateway.ModelParser,
+          RecLLMGateway.Pricing
+        ],
+        "Observability": [
+          RecLLMGateway.Telemetry,
+          RecLLMGateway.Usage,
+          RecLLMGateway.LiveDashboard
+        ],
+        "Application": [
+          RecLLMGateway.Application
+        ]
+      ]
+    ]
+  end
+
+  defp package do
+    [
+      name: "rec_llm_gateway",
+      licenses: ["MIT"],
+      links: %{
+        "GitHub" => @source_url,
+        "Changelog" => "#{@source_url}/blob/main/CHANGELOG.md"
+      },
+      files: ~w(lib .formatter.exs mix.exs README.md LICENSE CHANGELOG.md)
     ]
   end
 end
