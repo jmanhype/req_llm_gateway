@@ -61,7 +61,7 @@ defmodule RecLLMGateway.MixProject do
       {:telemetry_metrics, "~> 0.6"},
       {:telemetry_poller, "~> 1.0"},
       {:phoenix_live_dashboard, "~> 0.8"},
-      {:httpoison, "~> 2.0"},
+      {:req_llm, "~> 1.0.0-rc.6"},
       {:decimal, "~> 2.1"},
 
       # Development dependencies

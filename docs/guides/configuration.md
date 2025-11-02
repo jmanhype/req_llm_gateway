@@ -4,17 +4,11 @@ RecLLMGateway offers flexible configuration options for production deployments.
 
 ## Core Configuration
 
-All configuration is done via Application environment:
+RecLLMGateway uses [ReqLLM](https://github.com/agentjido/req_llm) for LLM provider integrations, which supports 45+ providers and 665+ models out of the box.
 
 ```elixir
 # config/config.exs
 config :rec_llm_gateway,
-  # Provider API keys (required)
-  api_keys: %{
-    "openai" => System.get_env("OPENAI_API_KEY"),
-    "anthropic" => System.get_env("ANTHROPIC_API_KEY")
-  },
-
   # Default provider when no prefix is specified (default: "openai")
   default_provider: "openai",
 
@@ -23,32 +17,52 @@ config :rec_llm_gateway,
 
   # Optional gateway authentication
   api_key: System.get_env("GATEWAY_API_KEY")
+
+# ReqLLM API key configuration
+config :req_llm,
+  openai_api_key: System.get_env("OPENAI_API_KEY"),
+  anthropic_api_key: System.get_env("ANTHROPIC_API_KEY"),
+  google_api_key: System.get_env("GOOGLE_API_KEY")
 ```
 
 ## API Keys
 
 ### Provider API Keys
 
-The `api_keys` map defines which LLM providers are available:
+RecLLMGateway uses ReqLLM for provider integrations. API keys are configured through ReqLLM's configuration system, which supports multiple methods:
 
-```elixir
-config :rec_llm_gateway,
-  api_keys: %{
-    "openai" => "sk-...",
-    "anthropic" => "sk-ant-...",
-    "custom" => "your-api-key"
-  }
+**Environment Variables (Recommended)**
+
+```bash
+export OPENAI_API_KEY="sk-..."
+export ANTHROPIC_API_KEY="sk-ant-..."
+export GOOGLE_API_KEY="..."
+export GROQ_API_KEY="gsk-..."
 ```
 
-Use environment variables for security:
+ReqLLM automatically picks up these environment variables.
+
+**Application Config**
 
 ```elixir
-config :rec_llm_gateway,
-  api_keys: %{
-    "openai" => System.get_env("OPENAI_API_KEY"),
-    "anthropic" => System.get_env("ANTHROPIC_API_KEY")
-  }
+# config/runtime.exs
+config :req_llm,
+  openai_api_key: System.get_env("OPENAI_API_KEY"),
+  anthropic_api_key: System.get_env("ANTHROPIC_API_KEY"),
+  google_api_key: System.get_env("GOOGLE_API_KEY"),
+  groq_api_key: System.get_env("GROQ_API_KEY")
 ```
+
+**Supported Providers**
+
+ReqLLM supports 45+ providers including:
+- OpenAI (gpt-4, gpt-4-turbo, gpt-3.5-turbo)
+- Anthropic (claude-3-opus, claude-3-sonnet, claude-3-haiku)
+- Google (gemini-pro, gemini-1.5-pro)
+- Groq (llama3, mixtral)
+- OpenRouter, xAI, AWS Bedrock, Cerebras, and many more
+
+See [ReqLLM's provider list](https://github.com/agentjido/req_llm#providers) for the complete catalog.
 
 ### Gateway Authentication
 

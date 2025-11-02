@@ -7,13 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **BREAKING**: Replaced custom HTTP client with ReqLLM integration
+  - Now supports 45+ LLM providers (OpenAI, Anthropic, Google, Groq, AWS Bedrock, etc.)
+  - API key configuration moved to ReqLLM (`:req_llm` config namespace)
+  - Automatic cost calculation and model registry (665+ models)
+  - Production-grade streaming support with HTTP/2
+- Updated all documentation to reflect ReqLLM usage
+- Simplified LLMClient module to be a thin wrapper around ReqLLM
+
 ### Added
-- Initial project setup with professional structure
-- Comprehensive documentation guides
-- CI/CD workflow with GitHub Actions
+- ReqLLM dependency (~> 1.0.0-rc.6) for multi-provider support
+- Support for 45+ providers beyond OpenAI and Anthropic
+- Automatic token counting and cost calculation via ReqLLM
+- Professional project structure with quality tools
+- Comprehensive documentation guides (5 guides, 2,175+ lines)
+- CI/CD workflow documentation
 - Code quality tools (Credo, Dialyzer, ExCoveralls)
-- Example applications (Phoenix, standalone)
-- Contributing guidelines
+- Example applications (Phoenix, standalone with Docker/K8s)
+- Contributing guidelines (CONTRIBUTING.md)
+- Test support infrastructure (ConnCase, mocks)
+
+### Removed
+- HTTPoison dependency (replaced by ReqLLM's Req-based client)
+- Custom provider HTTP implementations (now handled by ReqLLM)
 
 ## [0.1.0] - 2025-11-02
 

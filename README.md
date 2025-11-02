@@ -12,10 +12,11 @@ That's it. You now have a production-ready LLM gateway.
 ## What You Get
 
 - ✅ **OpenAI-compatible endpoint** - Works with existing SDKs (Python, JS, curl)
-- ✅ **Multi-provider routing** - `openai:gpt-4`, `anthropic:claude-3-sonnet`
+- ✅ **45+ LLM providers** - Powered by [ReqLLM](https://github.com/agentjido/req_llm) with 665+ models
+- ✅ **Multi-provider routing** - `openai:gpt-4`, `anthropic:claude-3-sonnet`, `google:gemini-pro`
 - ✅ **Built-in telemetry** - Emit events for observability
 - ✅ **Usage tracking** - ETS-backed stats (no database needed)
-- ✅ **Cost tracking** - Know what you're spending
+- ✅ **Automatic cost tracking** - ReqLLM calculates costs per provider/model
 - ✅ **LiveDashboard** - See usage stats at `/dashboard/rec_llm`
 
 ## Installation
@@ -34,13 +35,20 @@ end
 
 ### 1. Configure API Keys
 
+RecLLMGateway uses [ReqLLM](https://github.com/agentjido/req_llm) for provider integrations. Configure via environment variables:
+
+```bash
+export OPENAI_API_KEY="sk-..."
+export ANTHROPIC_API_KEY="sk-ant-..."
+```
+
+Or in config:
+
 ```elixir
 # config/config.exs
-config :rec_llm_gateway,
-  api_keys: %{
-    "openai" => System.get_env("OPENAI_API_KEY"),
-    "anthropic" => System.get_env("ANTHROPIC_API_KEY")
-  }
+config :req_llm,
+  openai_api_key: System.get_env("OPENAI_API_KEY"),
+  anthropic_api_key: System.get_env("ANTHROPIC_API_KEY")
 ```
 
 ### 2. Add to Router

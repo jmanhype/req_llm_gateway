@@ -6,7 +6,15 @@ This guide will help you get RecLLMGateway up and running in your Elixir/Phoenix
 
 - Elixir 1.14 or later
 - Phoenix 1.7+ (optional, but recommended)
-- API keys for at least one LLM provider (OpenAI, Anthropic, etc.)
+- API keys for at least one LLM provider (OpenAI, Anthropic, Google, etc.)
+
+## About ReqLLM
+
+RecLLMGateway uses [ReqLLM](https://github.com/agentjido/req_llm) under the hood, which provides:
+- **45+ LLM providers** including OpenAI, Anthropic, Google, Groq, AWS Bedrock, and more
+- **665+ models** with automatic cost calculation and token counting
+- **Unified API** with consistent request/response formats across all providers
+- **Production-grade streaming** with HTTP/2 multiplexing
 
 ## Installation
 
@@ -28,25 +36,30 @@ mix deps.get
 
 ## Configuration
 
-Configure your LLM provider API keys in `config/config.exs`:
+Configure your LLM provider API keys. RecLLMGateway uses ReqLLM for provider integrations, so API keys are configured for ReqLLM:
 
 ```elixir
+# config/config.exs
 config :rec_llm_gateway,
-  api_keys: %{
-    "openai" => System.get_env("OPENAI_API_KEY"),
-    "anthropic" => System.get_env("ANTHROPIC_API_KEY")
-  },
   default_provider: "openai",
   include_extensions: true
+
+# ReqLLM will automatically use environment variables
+# or you can configure them explicitly:
+config :req_llm,
+  openai_api_key: System.get_env("OPENAI_API_KEY"),
+  anthropic_api_key: System.get_env("ANTHROPIC_API_KEY")
 ```
 
 ### Environment Variables
 
-Create a `.env` file (or use your deployment environment):
+Set environment variables for your providers (ReqLLM automatically picks these up):
 
 ```bash
 export OPENAI_API_KEY="sk-..."
 export ANTHROPIC_API_KEY="sk-ant-..."
+export GOOGLE_API_KEY="..."
+export GROQ_API_KEY="gsk-..."
 ```
 
 ## Adding to Your Phoenix Router
