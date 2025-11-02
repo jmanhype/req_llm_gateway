@@ -1,23 +1,195 @@
-# ✨ Welcome to Your Spark Template!
-You've just launched your brand-new Spark Template Codespace — everything’s fired up and ready for you to explore, build, and create with Spark!
+# RecLLMGateway
 
-This template is your blank canvas. It comes with a minimal setup to help you get started quickly with Spark development.
+**OpenAI-compatible LLM proxy. Drop into Phoenix. Done.**
 
-🚀 What's Inside?
-- A clean, minimal Spark environment
-- Pre-configured for local development
-- Ready to scale with your ideas
-  
-🧠 What Can You Do?
+```elixir
+# In your router.ex
+forward "/v1/chat/completions", RecLLMGateway.Plug
+```
 
-Right now, this is just a starting point — the perfect place to begin building and testing your Spark applications.
+That's it. You now have a production-ready LLM gateway.
 
-🧹 Just Exploring?
-No problem! If you were just checking things out and don’t need to keep this code:
+## What You Get
 
-- Simply delete your Spark.
-- Everything will be cleaned up — no traces left behind.
+- ✅ **OpenAI-compatible endpoint** - Works with existing SDKs (Python, JS, curl)
+- ✅ **Multi-provider routing** - `openai:gpt-4`, `anthropic:claude-3-sonnet`
+- ✅ **Built-in telemetry** - Emit events for observability
+- ✅ **Usage tracking** - ETS-backed stats (no database needed)
+- ✅ **Cost tracking** - Know what you're spending
+- ✅ **LiveDashboard** - See usage stats at `/dashboard/rec_llm`
 
-📄 License For Spark Template Resources 
+## Installation
 
-The Spark Template files and resources from GitHub are licensed under the terms of the MIT license, Copyright GitHub, Inc.
+Add to `mix.exs`:
+
+```elixir
+def deps do
+  [
+    {:rec_llm_gateway, "~> 0.1.0"}
+  ]
+end
+```
+
+## Quick Start
+
+### 1. Configure API Keys
+
+```elixir
+# config/config.exs
+config :rec_llm_gateway,
+  api_keys: %{
+    "openai" => System.get_env("OPENAI_API_KEY"),
+    "anthropic" => System.get_env("ANTHROPIC_API_KEY")
+  }
+```
+
+### 2. Add to Router
+
+```elixir
+# lib/my_app_web/router.ex
+scope "/v1" do
+  forward "/chat/completions", RecLLMGateway.Plug
+end
+
+# Add LiveDashboard page
+live_dashboard "/dashboard",
+  additional_pages: [
+    rec_llm: RecLLMGateway.LiveDashboard
+  ]
+```
+
+### 3. Use It
+
+```bash
+curl http://localhost:4000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "openai:gpt-4",
+    "messages": [{"role": "user", "content": "Hello!"}]
+  }'
+```
+
+## Model Routing
+
+Specify provider explicitly:
+```json
+{"model": "openai:gpt-4"}
+{"model": "anthropic:claude-3-sonnet-20240229"}
+```
+
+Or use default provider:
+```json
+{"model": "gpt-4"}  // Uses default_provider from config
+```
+
+## Response Format
+
+Standard OpenAI response + optional extensions:
+
+```json
+{
+  "choices": [...],
+  "usage": {"prompt_tokens": 10, "completion_tokens": 20},
+  "x_rec_llm": {
+    "provider": "openai",
+    "latency_ms": 342,
+    "cost_usd": 0.000063
+  }
+}
+```
+
+## Works With Existing Tools
+
+**Python:**
+```python
+from openai import OpenAI
+
+client = OpenAI(base_url="http://localhost:4000/v1", api_key="not-needed")
+response = client.chat.completions.create(
+    model="anthropic:claude-3-sonnet-20240229",
+    messages=[{"role": "user", "content": "Hello!"}]
+)
+```
+
+**JavaScript, Go, Ruby** - Any OpenAI-compatible SDK works.
+
+## Configuration Options
+
+```elixir
+config :rec_llm_gateway,
+  # Default provider when model has no prefix (default: "openai")
+  default_provider: "openai",
+
+  # Include x_rec_llm extension in responses (default: true)
+  include_extensions: true,
+
+  # Optional gateway authentication
+  api_key: System.get_env("GATEWAY_API_KEY"),
+
+  # Provider API keys
+  api_keys: %{
+    "openai" => System.get_env("OPENAI_API_KEY"),
+    "anthropic" => System.get_env("ANTHROPIC_API_KEY")
+  }
+```
+
+## Usage Tracking
+
+Stats are automatically tracked in ETS:
+
+```elixir
+RecLLMGateway.Usage.get_all()
+#=> [
+#  %{
+#    date: ~D[2024-01-15],
+#    provider: "openai",
+#    model: "gpt-4",
+#    calls: 42,
+#    total_tokens: 2140,
+#    cost_usd: 0.128,
+#    avg_latency_ms: 325
+#  }
+#]
+```
+
+Or view in LiveDashboard at `/dashboard/rec_llm`.
+
+## Telemetry
+
+Emits standard telemetry events:
+
+- `[:rec_llm_gateway, :request, :start]`
+- `[:rec_llm_gateway, :request, :stop]` - includes tokens, latency
+- `[:rec_llm_gateway, :request, :exception]`
+
+Hook into your existing observability stack.
+
+## Testing
+
+Mock the LLM client in tests:
+
+```elixir
+# config/test.exs
+config :rec_llm_gateway,
+  llm_client: MyApp.LLMClientMock
+```
+
+See `test/` directory for examples.
+
+## That's It
+
+~500 lines of code. Zero JavaScript. No database. Just Elixir.
+
+Add it to your Phoenix app and you have a production-ready LLM gateway with telemetry, usage tracking, and multi-provider routing.
+
+**Heads will explode.** 🤯
+
+## MVP Limitations
+
+- **No streaming** - `stream: true` returns an error (coming soon)
+- **No persistence** - Usage data is in-memory (restart = reset)
+- **No rate limiting** - Add a reverse proxy if needed
+
+## License
+
+MIT
