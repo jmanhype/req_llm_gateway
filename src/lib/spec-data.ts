@@ -60,8 +60,8 @@ export const components: Component[] = [
     responsibility: 'Emits :start, :stop, :exception events with metrics for observability integrations'
   },
   {
-    name: 'Dashboard Page',
-    file: 'rec_llm_gateway/dashboard_page.ex',
+    name: 'LiveDashboard Page',
+    file: 'rec_llm_gateway/live_dashboard.ex',
     description: 'Phoenix LiveDashboard integration',
     responsibility: 'Displays usage statistics table in LiveDashboard with sortable columns and formatted values'
   },
@@ -70,6 +70,12 @@ export const components: Component[] = [
     file: 'rec_llm_gateway/pricing.ex',
     description: 'Optional cost calculation',
     responsibility: 'Calculates USD costs based on token usage and configured model pricing'
+  },
+  {
+    name: 'LLM Client',
+    file: 'rec_llm_gateway/llm_client.ex',
+    description: 'Provider API integration',
+    responsibility: 'Communicates with OpenAI and Anthropic APIs, transforms requests/responses, handles errors'
   },
 ]
 

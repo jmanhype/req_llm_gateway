@@ -8,7 +8,7 @@ export function ComponentsSection() {
       <div>
         <h2 className="text-3xl font-bold mb-3">Core Components</h2>
         <p className="text-lg text-muted-foreground">
-          Six Elixir modules that power the gateway functionality
+          Seven Elixir modules that power the gateway functionality
         </p>
       </div>
 
@@ -24,21 +24,29 @@ export function ComponentsSection() {
           <code className="text-sm font-mono text-foreground">{`lib/
   rec_llm_gateway/
     application.ex        # OTP application & supervisor
-    plug.ex              # Main endpoint handler
-    usage.ex             # ETS-backed usage counters
-    telemetry.ex         # Telemetry event helpers
-    dashboard_page.ex    # Phoenix LiveDashboard page
-    model_parser.ex      # Parse provider:model syntax
-    pricing.ex           # Optional cost calculator
+    plug.ex               # Main endpoint handler
+    usage.ex              # ETS-backed usage counters
+    telemetry.ex          # Telemetry event helpers
+    live_dashboard.ex     # Phoenix LiveDashboard page
+    model_parser.ex       # Parse provider:model syntax
+    pricing.ex            # Optional cost calculator
+    llm_client.ex         # Provider API integration
+
+config/
+    config.exs            # Main configuration
+    dev.exs               # Development settings
+    test.exs              # Test settings
+    prod.exs              # Production settings
 
 test/
   rec_llm_gateway/
     plug_test.exs
     usage_test.exs
     model_parser_test.exs
+    pricing_test.exs
 
 mix.exs
-README.md`}</code>
+README_IMPLEMENTATION.md`}</code>
         </pre>
       </div>
     </div>
