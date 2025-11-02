@@ -1,0 +1,38 @@
+@prefix rec: <https://spec.rec-llm-gateway.dev/rec#> .
+@prefix kgc: <https://viable-system.com/kgc#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# Example request (Observation O)
+rec:req1 a rec:Request ;
+  rec:modelId "openai:gpt-4o-mini" ;
+  rec:temperature "0.2"^^xsd:decimal ;
+  rec:stream "false"^^xsd:boolean ;
+  rec:hasMessage rec:req1_m1 .
+
+rec:req1_m1 a rec:Message ;
+  rec:role rec:User ;
+  rec:content "Hello!" .
+
+# Example response (Action A)
+rec:resp1 a rec:Response ;
+  rec:choice rec:resp1_c1 ;
+  rec:usage rec:resp1_usage ;
+  rec:extension rec:resp1_ext ;
+  kgc:underPolicy rec:policy_det .
+
+rec:resp1_c1 a rec:Choice ; rec:finishReason rec:stop .
+rec:resp1_usage a rec:Usage ;
+  rec:promptTokens 12 ; rec:completionTokens 9 ; rec:totalTokens 21 .
+rec:resp1_ext a rec:Extension ;
+  rec:xProvider rec:OpenAI ;
+  rec:latencyMs 342 ;
+  rec:costUSD "0.000063"^^xsd:decimal ;
+  rec:receiptChain "sha256:abcd1234..." .
+
+# μ mapping and receipt
+rec:gateway kgc:mu rec:chatCompletions .
+rec:req1 kgc:reconciledTo rec:resp1 .
+rec:resp1 kgc:emits rec:rcpt1 .
+
+rec:rcpt1 a rec:Receipt ;
+  rec:receiptChain "sha256:abcd1234..." .

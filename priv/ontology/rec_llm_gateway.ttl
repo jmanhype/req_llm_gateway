@@ -1,0 +1,129 @@
+@prefix rec:   <https://spec.rec-llm-gateway.dev/rec#> .
+@prefix kgc:   <https://viable-system.com/kgc#> .
+@prefix rdf:   <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:   <http://www.w3.org/2002/07/owl#> .
+@prefix xsd:   <http://www.w3.org/2001/XMLSchema#> .
+@prefix prov:  <http://www.w3.org/ns/prov#> .
+
+### ─────────────────────────
+### Core classes (PRD mirror)
+### ─────────────────────────
+rec:Gateway a owl:Class ; rdfs:label "Rec LLM Gateway" .
+rec:Endpoint a owl:Class ; rdfs:label "HTTP Endpoint" .
+rec:ChatCompletionsEndpoint a owl:Class ;
+  rdfs:subClassOf rec:Endpoint ;
+  rdfs:comment "POST /v1/chat/completions (OpenAI-compatible)" .
+
+rec:Request a owl:Class .
+rec:Response a owl:Class .
+rec:Error a owl:Class .
+rec:Choice a owl:Class .
+rec:Message a owl:Class .
+rec:Usage a owl:Class .
+rec:Extension a owl:Class .        # x_rec_llm
+rec:Policy a owl:Class .           # H (creativity, routing policy)
+rec:Receipt a owl:Class .          # kgc morphism (audit)
+
+rec:Provider a owl:Class .
+rec:Model a owl:Class .
+rec:Pricing a owl:Class .
+
+rec:TelemetryEvent a owl:Class .
+rec:StartEvent a owl:Class ; rdfs:subClassOf rec:TelemetryEvent .
+rec:StopEvent  a owl:Class ; rdfs:subClassOf rec:TelemetryEvent .
+rec:ExceptionEvent a owl:Class ; rdfs:subClassOf rec:TelemetryEvent .
+
+### ─────────────────────────
+### Enumerations
+### ─────────────────────────
+rec:Role a owl:Class ;
+  owl:oneOf ( rec:System rec:User rec:Assistant rec:Tool ) .
+
+rec:FinishReason a owl:Class ;
+  owl:oneOf ( rec:stop rec:length rec:content_filter rec:function_call rec:tool_calls rec:unknown ) .
+
+rec:ErrorType a owl:Class ;
+  owl:oneOf ( rec:invalid_request_error rec:authentication_error rec:rate_limit_error rec:api_error rec:timeout_error ) .
+
+### Common providers (extensible)
+rec:OpenAI a rec:Provider .
+rec:Anthropic a rec:Provider .
+
+### ─────────────────────────
+### Properties
+### ─────────────────────────
+rec:hasEndpoint a owl:ObjectProperty ; rdfs:domain rec:Gateway ; rdfs:range rec:Endpoint .
+rec:accepts a owl:ObjectProperty ; rdfs:domain rec:Endpoint ; rdfs:range rec:Request .
+rec:produces a owl:ObjectProperty ; rdfs:domain rec:Endpoint ; rdfs:range rec:Response .
+
+rec:hasMessage a owl:ObjectProperty ; rdfs:domain rec:Request ; rdfs:range rec:Message .
+rec:role a owl:ObjectProperty ; rdfs:domain rec:Message ; rdfs:range rec:Role .
+rec:content a owl:DatatypeProperty ; rdfs:domain rec:Message ; rdfs:range xsd:string .
+
+rec:modelId a owl:DatatypeProperty ; rdfs:domain rec:Request ; rdfs:range xsd:string .
+rec:provider a owl:ObjectProperty ; rdfs:domain rec:Request ; rdfs:range rec:Provider .
+rec:modelName a owl:DatatypeProperty ; rdfs:domain rec:Request ; rdfs:range xsd:string .
+
+rec:temperature a owl:DatatypeProperty ; rdfs:domain rec:Request ; rdfs:range xsd:decimal .
+rec:maxTokens a owl:DatatypeProperty ; rdfs:domain rec:Request ; rdfs:range xsd:integer .
+rec:topP a owl:DatatypeProperty ; rdfs:domain rec:Request ; rdfs:range xsd:decimal .
+rec:frequencyPenalty a owl:DatatypeProperty ; rdfs:domain rec:Request ; rdfs:range xsd:decimal .
+rec:presencePenalty a owl:DatatypeProperty ; rdfs:domain rec:Request ; rdfs:range xsd:decimal .
+rec:stopSeq a owl:DatatypeProperty ; rdfs:domain rec:Request ; rdfs:range xsd:string .
+rec:stream a owl:DatatypeProperty ; rdfs:domain rec:Request ; rdfs:range xsd:boolean .
+rec:toolsJSON a owl:DatatypeProperty ; rdfs:domain rec:Request ; rdfs:range xsd:string .
+rec:toolChoice a owl:DatatypeProperty ; rdfs:domain rec:Request ; rdfs:range xsd:string .
+
+rec:choice a owl:ObjectProperty ; rdfs:domain rec:Response ; rdfs:range rec:Choice .
+rec:finishReason a owl:ObjectProperty ; rdfs:domain rec:Choice ; rdfs:range rec:FinishReason .
+rec:usage a owl:ObjectProperty ; rdfs:domain rec:Response ; rdfs:range rec:Usage .
+
+rec:promptTokens a owl:DatatypeProperty ; rdfs:domain rec:Usage ; rdfs:range xsd:integer .
+rec:completionTokens a owl:DatatypeProperty ; rdfs:domain rec:Usage ; rdfs:range xsd:integer .
+rec:totalTokens a owl:DatatypeProperty ; rdfs:domain rec:Usage ; rdfs:range xsd:integer .
+
+# x_rec_llm extension
+rec:extension a owl:ObjectProperty ; rdfs:domain rec:Response ; rdfs:range rec:Extension .
+rec:xProvider a owl:ObjectProperty ; rdfs:domain rec:Extension ; rdfs:range rec:Provider .
+rec:latencyMs a owl:DatatypeProperty ; rdfs:domain rec:Extension ; rdfs:range xsd:integer .
+rec:costUSD a owl:DatatypeProperty ; rdfs:domain rec:Extension ; rdfs:range xsd:decimal .
+rec:receiptChain a owl:DatatypeProperty ; rdfs:domain rec:Extension ; rdfs:range xsd:string .
+
+# Errors
+rec:error a owl:ObjectProperty ; rdfs:domain rec:Response ; rdfs:range rec:Error .
+rec:errorType a owl:ObjectProperty ; rdfs:domain rec:Error ; rdfs:range rec:ErrorType .
+rec:errorMessage a owl:DatatypeProperty ; rdfs:domain rec:Error ; rdfs:range xsd:string .
+rec:errorCode a owl:DatatypeProperty ; rdfs:domain rec:Error ; rdfs:range xsd:string .
+
+# Pricing
+rec:hasPricing a owl:ObjectProperty ; rdfs:domain rec:Model ; rdfs:range rec:Pricing .
+rec:inputPerMillion a owl:DatatypeProperty ; rdfs:domain rec:Pricing ; rdfs:range xsd:decimal .
+rec:outputPerMillion a owl:DatatypeProperty ; rdfs:domain rec:Pricing ; rdfs:range xsd:decimal .
+
+# Telemetry / PROV
+rec:emitted a owl:ObjectProperty ; rdfs:domain rec:Gateway ; rdfs:range rec:TelemetryEvent .
+prov:wasGeneratedBy a owl:ObjectProperty .
+prov:used a owl:ObjectProperty .
+prov:atTime a owl:DatatypeProperty ; rdfs:range xsd:dateTime .
+
+### ─────────────────────────
+### KGC bindings (μ, receipts)
+### ─────────────────────────
+kgc:reconciledTo a owl:ObjectProperty ; rdfs:domain rec:Request ; rdfs:range rec:Response .
+kgc:emits a owl:ObjectProperty ; rdfs:domain rec:Response ; rdfs:range rec:Receipt .
+kgc:underPolicy a owl:ObjectProperty ; rdfs:domain rec:Response ; rdfs:range rec:Policy .
+kgc:mu a owl:ObjectProperty ; rdfs:domain rec:Gateway ; rdfs:range owl:Thing ;
+  rdfs:comment "Abstract μ mapping: A = μ(O)." .
+
+### ─────────────────────────
+### Endpoint instance
+### ─────────────────────────
+rec:gateway a rec:Gateway ;
+  rec:hasEndpoint rec:chatCompletions ;
+  rdfs:comment "Single OpenAI-compatible endpoint; pass-through parameters per PRD." .
+
+rec:chatCompletions a rec:ChatCompletionsEndpoint ;
+  rec:accepts rec:Request ;
+  rec:produces rec:Response ;
+  rdfs:comment "POST /v1/chat/completions" .
