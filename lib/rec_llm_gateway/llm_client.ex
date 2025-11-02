@@ -1,19 +1,65 @@
 defmodule RecLLMGateway.LLMClient do
   @moduledoc """
-  Behaviour and default implementation for LLM API clients.
+  Behaviour and implementation for LLM API clients using ReqLLM.
 
-  This module defines the contract for calling LLM providers and provides
-  a basic HTTP implementation. In tests, this can be mocked using Mox.
+  This module provides a thin wrapper around the ReqLLM library, which supports
+  45+ LLM providers including OpenAI, Anthropic, Google, AWS Bedrock, and more.
 
   ## Configuration
 
-  Provider API keys should be configured in your application config:
+  ReqLLM automatically picks up API keys from environment variables or application config:
 
-      config :rec_llm_gateway, :api_keys, %{
-        "openai" => System.get_env("OPENAI_API_KEY"),
-        "anthropic" => System.get_env("ANTHROPIC_API_KEY")
-      }
+  ### Method 1: Environment Variables (Recommended)
+
+      export OPENAI_API_KEY="sk-..."
+      export ANTHROPIC_API_KEY="sk-ant-..."
+      export GOOGLE_API_KEY="..."
+      # ... and so on for other providers
+
+  ### Method 2: Application Config
+
+      config :req_llm,
+        openai_api_key: System.get_env("OPENAI_API_KEY"),
+        anthropic_api_key: System.get_env("ANTHROPIC_API_KEY"),
+        google_api_key: System.get_env("GOOGLE_API_KEY")
+
+  ## Supported Providers
+
+  ReqLLM supports 45+ providers out of the box:
+
+  - **OpenAI**: gpt-4, gpt-3.5-turbo, etc.
+  - **Anthropic**: claude-3-opus, claude-3-sonnet, claude-3-haiku
+  - **Google**: gemini-pro, gemini-1.5-pro, gemini-ultra
+  - **AWS Bedrock**: Various models via AWS
+  - **Groq**: llama3-70b, mixtral-8x7b
+  - **xAI**: grok-beta
+  - **Cerebras**: llama3.1-8b, llama3.1-70b
+  - **OpenRouter**: Unified access to multiple providers
+  - And 35+ more!
+
+  ## Usage
+
+  The module uses ReqLLM's `provider:model` syntax:
+
+      RecLLMGateway.LLMClient.chat_completion("openai", "gpt-4", request)
+      RecLLMGateway.LLMClient.chat_completion("anthropic", "claude-3-opus-20240229", request)
+      RecLLMGateway.LLMClient.chat_completion("google", "gemini-pro", request)
+
+  ## Features
+
+  - **665+ models** in the ReqLLM registry
+  - **Automatic cost calculation** for all models
+  - **Token counting** and usage tracking
+  - **HTTP/2 streaming** support
+  - **Robust error handling**
+  - **Model metadata** and validation
+
+  ## Testing
+
+  In tests, this behaviour can be mocked using Mox for deterministic testing.
   """
+
+  require Logger
 
   @callback chat_completion(provider :: String.t(), model :: String.t(), request :: map()) ::
               {:ok, map()} | {:error, map()}
@@ -22,118 +68,197 @@ defmodule RecLLMGateway.LLMClient do
 
   @impl true
   def chat_completion(provider, model, request) do
-    case provider do
-      "openai" -> openai_chat_completion(model, request)
-      "anthropic" -> anthropic_chat_completion(model, request)
-      _ -> {:error, %{type: "api_error", message: "Unsupported provider: #{provider}"}}
+    # Build the provider:model identifier that ReqLLM expects
+    model_identifier = "#{provider}:#{model}"
+
+    # Extract messages and options from the request
+    messages = Map.get(request, "messages", [])
+
+    # Build options for ReqLLM
+    opts = build_options(request)
+
+    Logger.debug("Making LLM request to #{model_identifier}")
+    Logger.debug("Messages: #{inspect(messages)}")
+    Logger.debug("Options: #{inspect(opts)}")
+
+    case ReqLLM.generate_text(model_identifier, messages, opts) do
+      {:ok, response} ->
+        # Transform ReqLLM response to OpenAI-compatible format
+        openai_response = transform_to_openai_format(response, model)
+        Logger.debug("LLM response: #{inspect(openai_response)}")
+        {:ok, openai_response}
+
+      {:error, reason} = error ->
+        Logger.error("LLM request failed: #{inspect(reason)}")
+        # Transform error to OpenAI-compatible format
+        {:error, transform_error(reason)}
+    end
+  rescue
+    exception ->
+      Logger.error("Exception in LLM request: #{inspect(exception)}")
+      {:error, %{
+        type: "api_error",
+        message: "Internal error: #{Exception.message(exception)}"
+      }}
+  end
+
+  # Build options for ReqLLM from OpenAI-style request
+  defp build_options(request) do
+    opts = []
+
+    opts = maybe_add_option(opts, :temperature, request["temperature"])
+    opts = maybe_add_option(opts, :max_tokens, request["max_tokens"])
+    opts = maybe_add_option(opts, :top_p, request["top_p"])
+    opts = maybe_add_option(opts, :frequency_penalty, request["frequency_penalty"])
+    opts = maybe_add_option(opts, :presence_penalty, request["presence_penalty"])
+    opts = maybe_add_option(opts, :stop, request["stop"])
+    opts = maybe_add_option(opts, :stream, request["stream"])
+    opts = maybe_add_option(opts, :user, request["user"])
+
+    # Add any additional parameters that weren't explicitly handled
+    custom_params = Map.drop(request, [
+      "messages", "model",
+      "temperature", "max_tokens", "top_p",
+      "frequency_penalty", "presence_penalty",
+      "stop", "stream", "user"
+    ])
+
+    if map_size(custom_params) > 0 do
+      Keyword.merge(opts, Map.to_list(custom_params))
+    else
+      opts
     end
   end
 
-  # OpenAI implementation
-  defp openai_chat_completion(model, request) do
-    url = "https://api.openai.com/v1/chat/completions"
-    api_key = get_api_key("openai")
+  defp maybe_add_option(opts, _key, nil), do: opts
+  defp maybe_add_option(opts, key, value), do: Keyword.put(opts, key, value)
 
-    headers = [
-      {"Authorization", "Bearer #{api_key}"},
-      {"Content-Type", "application/json"}
-    ]
+  # Transform ReqLLM response to OpenAI-compatible format
+  defp transform_to_openai_format(response, model) do
+    # ReqLLM returns responses in different formats depending on the provider
+    # We need to normalize to OpenAI's format
+    case response do
+      # If ReqLLM already returns OpenAI format (for OpenAI provider)
+      %{"choices" => _choices, "usage" => _usage} = openai_format ->
+        openai_format
 
-    body =
-      request
-      |> Map.put("model", model)
-      |> Jason.encode!()
-
-    case HTTPoison.post(url, body, headers, timeout: 60_000, recv_timeout: 60_000) do
-      {:ok, %{status_code: 200, body: response_body}} ->
-        {:ok, Jason.decode!(response_body)}
-
-      {:ok, %{status_code: status, body: response_body}} ->
-        error = Jason.decode!(response_body)
-        {:error, Map.get(error, "error", %{type: "api_error", message: "HTTP #{status}"})}
-
-      {:error, %HTTPoison.Error{reason: reason}} ->
-        {:error, %{type: "timeout_error", message: "Request failed: #{inspect(reason)}"}}
-    end
-  end
-
-  # Anthropic implementation
-  defp anthropic_chat_completion(model, request) do
-    url = "https://api.anthropic.com/v1/messages"
-    api_key = get_api_key("anthropic")
-
-    headers = [
-      {"x-api-key", api_key},
-      {"anthropic-version", "2023-06-01"},
-      {"Content-Type", "application/json"}
-    ]
-
-    # Transform OpenAI format to Anthropic format
-    body =
-      %{
-        "model" => model,
-        "max_tokens" => request["max_tokens"] || 1024,
-        "messages" => request["messages"]
-      }
-      |> maybe_add("temperature", request["temperature"])
-      |> maybe_add("top_p", request["top_p"])
-      |> maybe_add("stop_sequences", request["stop"])
-      |> Jason.encode!()
-
-    case HTTPoison.post(url, body, headers, timeout: 60_000, recv_timeout: 60_000) do
-      {:ok, %{status_code: 200, body: response_body}} ->
-        anthropic_response = Jason.decode!(response_body)
-        {:ok, transform_anthropic_response(anthropic_response, model)}
-
-      {:ok, %{status_code: status, body: response_body}} ->
-        error = Jason.decode!(response_body)
-        {:error, Map.get(error, "error", %{type: "api_error", message: "HTTP #{status}"})}
-
-      {:error, %HTTPoison.Error{reason: reason}} ->
-        {:error, %{type: "timeout_error", message: "Request failed: #{inspect(reason)}"}}
-    end
-  end
-
-  # Transform Anthropic response to OpenAI format
-  defp transform_anthropic_response(response, model) do
-    %{
-      "id" => response["id"],
-      "object" => "chat.completion",
-      "created" => System.system_time(:second),
-      "model" => model,
-      "choices" => [
+      # If it's a direct text response, wrap it in OpenAI format
+      %{"text" => text} ->
         %{
-          "index" => 0,
-          "message" => %{
-            "role" => "assistant",
-            "content" => get_content_text(response["content"])
-          },
-          "finish_reason" => map_stop_reason(response["stop_reason"])
+          "id" => generate_id(),
+          "object" => "chat.completion",
+          "created" => System.system_time(:second),
+          "model" => model,
+          "choices" => [
+            %{
+              "index" => 0,
+              "message" => %{
+                "role" => "assistant",
+                "content" => text
+              },
+              "finish_reason" => "stop"
+            }
+          ],
+          "usage" => Map.get(response, "usage", %{
+            "prompt_tokens" => 0,
+            "completion_tokens" => 0,
+            "total_tokens" => 0
+          })
         }
-      ],
-      "usage" => %{
-        "prompt_tokens" => response["usage"]["input_tokens"],
-        "completion_tokens" => response["usage"]["output_tokens"],
-        "total_tokens" =>
-          response["usage"]["input_tokens"] + response["usage"]["output_tokens"]
-      }
-    }
+
+      # If response has content field (e.g., from Anthropic)
+      %{"content" => content} = resp ->
+        text_content = extract_text_content(content)
+        usage = Map.get(resp, "usage", %{})
+
+        %{
+          "id" => Map.get(resp, "id", generate_id()),
+          "object" => "chat.completion",
+          "created" => System.system_time(:second),
+          "model" => model,
+          "choices" => [
+            %{
+              "index" => 0,
+              "message" => %{
+                "role" => "assistant",
+                "content" => text_content
+              },
+              "finish_reason" => map_finish_reason(Map.get(resp, "stop_reason", "stop"))
+            }
+          ],
+          "usage" => %{
+            "prompt_tokens" => Map.get(usage, "input_tokens", 0),
+            "completion_tokens" => Map.get(usage, "output_tokens", 0),
+            "total_tokens" =>
+              Map.get(usage, "input_tokens", 0) + Map.get(usage, "output_tokens", 0)
+          }
+        }
+
+      # Fallback for unexpected formats
+      other ->
+        Logger.warning("Unexpected response format from ReqLLM: #{inspect(other)}")
+        %{
+          "id" => generate_id(),
+          "object" => "chat.completion",
+          "created" => System.system_time(:second),
+          "model" => model,
+          "choices" => [
+            %{
+              "index" => 0,
+              "message" => %{
+                "role" => "assistant",
+                "content" => inspect(other)
+              },
+              "finish_reason" => "stop"
+            }
+          ],
+          "usage" => %{
+            "prompt_tokens" => 0,
+            "completion_tokens" => 0,
+            "total_tokens" => 0
+          }
+        }
+    end
   end
 
-  defp get_content_text([%{"text" => text} | _]), do: text
-  defp get_content_text([%{"type" => "text", "text" => text} | _]), do: text
-  defp get_content_text(_), do: ""
+  # Extract text content from various content formats
+  defp extract_text_content(content) when is_binary(content), do: content
+  defp extract_text_content([%{"text" => text} | _]), do: text
+  defp extract_text_content([%{"type" => "text", "text" => text} | _]), do: text
+  defp extract_text_content(content) when is_list(content) do
+    content
+    |> Enum.map(fn
+      %{"text" => text} -> text
+      %{"type" => "text", "text" => text} -> text
+      _ -> ""
+    end)
+    |> Enum.join("")
+  end
+  defp extract_text_content(_), do: ""
 
-  defp map_stop_reason("end_turn"), do: "stop"
-  defp map_stop_reason("max_tokens"), do: "length"
-  defp map_stop_reason("stop_sequence"), do: "stop"
-  defp map_stop_reason(_), do: "stop"
+  # Map various stop reasons to OpenAI's finish_reason values
+  defp map_finish_reason("end_turn"), do: "stop"
+  defp map_finish_reason("max_tokens"), do: "length"
+  defp map_finish_reason("stop_sequence"), do: "stop"
+  defp map_finish_reason("stop"), do: "stop"
+  defp map_finish_reason("length"), do: "length"
+  defp map_finish_reason(_), do: "stop"
 
-  defp maybe_add(map, _key, nil), do: map
-  defp maybe_add(map, key, value), do: Map.put(map, key, value)
+  # Transform ReqLLM errors to OpenAI-compatible format
+  defp transform_error(reason) when is_binary(reason) do
+    %{type: "api_error", message: reason}
+  end
 
-  defp get_api_key(provider) do
-    api_keys = Application.get_env(:rec_llm_gateway, :api_keys, %{})
-    Map.get(api_keys, provider) || raise "Missing API key for provider: #{provider}"
+  defp transform_error(%{message: message}) do
+    %{type: "api_error", message: message}
+  end
+
+  defp transform_error(reason) do
+    %{type: "api_error", message: inspect(reason)}
+  end
+
+  # Generate a unique ID for responses
+  defp generate_id do
+    "chatcmpl-" <> Base.encode16(:crypto.strong_rand_bytes(12), case: :lower)
   end
 end

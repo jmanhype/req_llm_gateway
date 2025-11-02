@@ -28,25 +28,37 @@ mix deps.get
 
 ## Configuration
 
-Configure your LLM provider API keys in `config/config.exs`:
+RecLLMGateway uses ReqLLM under the hood, which automatically picks up API keys from environment variables.
 
-```elixir
-config :rec_llm_gateway,
-  api_keys: %{
-    "openai" => System.get_env("OPENAI_API_KEY"),
-    "anthropic" => System.get_env("ANTHROPIC_API_KEY")
-  },
-  default_provider: "openai",
-  include_extensions: true
-```
-
-### Environment Variables
+### Environment Variables (Recommended)
 
 Create a `.env` file (or use your deployment environment):
 
 ```bash
 export OPENAI_API_KEY="sk-..."
 export ANTHROPIC_API_KEY="sk-ant-..."
+export GOOGLE_API_KEY="..."
+export GROQ_API_KEY="gsk_..."
+# ... add keys for other providers as needed
+```
+
+That's it! No additional configuration needed.
+
+### Optional: Explicit Configuration
+
+If you prefer explicit configuration, add to `config/config.exs`:
+
+```elixir
+# ReqLLM provider keys
+config :req_llm,
+  openai_api_key: System.get_env("OPENAI_API_KEY"),
+  anthropic_api_key: System.get_env("ANTHROPIC_API_KEY"),
+  google_api_key: System.get_env("GOOGLE_API_KEY")
+
+# RecLLMGateway settings
+config :rec_llm_gateway,
+  default_provider: "openai",
+  include_extensions: true
 ```
 
 ## Adding to Your Phoenix Router
@@ -84,13 +96,46 @@ View stats at `http://localhost:4000/dashboard/rec_llm`.
 
 ## Testing Your Setup
 
+RecLLMGateway supports 45+ providers via ReqLLM. Here are some examples:
+
 ### Using curl
 
+**OpenAI:**
 ```bash
 curl http://localhost:4000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
     "model": "openai:gpt-4",
+    "messages": [{"role": "user", "content": "Hello, world!"}]
+  }'
+```
+
+**Anthropic:**
+```bash
+curl http://localhost:4000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "anthropic:claude-3-opus-20240229",
+    "messages": [{"role": "user", "content": "Hello, world!"}]
+  }'
+```
+
+**Google Gemini:**
+```bash
+curl http://localhost:4000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "google:gemini-1.5-pro",
+    "messages": [{"role": "user", "content": "Hello, world!"}]
+  }'
+```
+
+**Groq (Fast Inference):**
+```bash
+curl http://localhost:4000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "groq:llama3-70b-8192",
     "messages": [{"role": "user", "content": "Hello, world!"}]
   }'
 ```
