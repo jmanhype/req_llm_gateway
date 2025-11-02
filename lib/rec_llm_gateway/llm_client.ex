@@ -68,6 +68,51 @@ defmodule RecLLMGateway.LLMClient do
 
   @impl true
   def chat_completion(provider, model, request) do
+    # Validate request inputs
+    with :ok <- validate_request(request) do
+      perform_chat_completion(provider, model, request)
+    end
+  rescue
+    exception ->
+      Logger.error("Exception in LLM request for #{provider}:#{model}",
+        error: Exception.message(exception),
+        provider: provider,
+        model: model
+      )
+      {:error, %{
+        type: "api_error",
+        message: "Internal error: #{Exception.message(exception)}"
+      }}
+  end
+
+  # Validate request inputs before processing
+  defp validate_request(request) do
+    cond do
+      not is_map(request) ->
+        {:error, %{type: "invalid_request_error", message: "Request must be a map"}}
+
+      not Map.has_key?(request, "messages") ->
+        {:error, %{type: "invalid_request_error", message: "Missing required field: messages"}}
+
+      not is_list(request["messages"]) or request["messages"] == [] ->
+        {:error, %{type: "invalid_request_error", message: "Messages must be a non-empty list"}}
+
+      not valid_messages?(request["messages"]) ->
+        {:error, %{type: "invalid_request_error", message: "Invalid message format"}}
+
+      true ->
+        :ok
+    end
+  end
+
+  # Validate that all messages have required fields
+  defp valid_messages?(messages) do
+    Enum.all?(messages, fn msg ->
+      is_map(msg) and Map.has_key?(msg, "role") and Map.has_key?(msg, "content")
+    end)
+  end
+
+  defp perform_chat_completion(provider, model, request) do
     # Build the provider:model identifier that ReqLLM expects
     model_identifier = "#{provider}:#{model}"
 
@@ -77,29 +122,36 @@ defmodule RecLLMGateway.LLMClient do
     # Build options for ReqLLM
     opts = build_options(request)
 
-    Logger.debug("Making LLM request to #{model_identifier}")
-    Logger.debug("Messages: #{inspect(messages)}")
-    Logger.debug("Options: #{inspect(opts)}")
+    # Log request without sensitive data
+    Logger.info("Making LLM request",
+      provider: provider,
+      model: model,
+      message_count: length(messages),
+      has_options: opts != []
+    )
 
     case ReqLLM.generate_text(model_identifier, messages, opts) do
       {:ok, response} ->
         # Transform ReqLLM response to OpenAI-compatible format
-        openai_response = transform_to_openai_format(response, model)
-        Logger.debug("LLM response: #{inspect(openai_response)}")
+        openai_response = transform_to_openai_format(response, model, provider)
+
+        Logger.info("LLM request completed successfully",
+          provider: provider,
+          model: model,
+          tokens: get_in(openai_response, ["usage", "total_tokens"])
+        )
+
         {:ok, openai_response}
 
-      {:error, reason} = error ->
-        Logger.error("LLM request failed: #{inspect(reason)}")
+      {:error, reason} ->
+        Logger.error("LLM request failed",
+          provider: provider,
+          model: model,
+          error_type: error_type(reason)
+        )
         # Transform error to OpenAI-compatible format
-        {:error, transform_error(reason)}
+        {:error, transform_error(reason, provider, model)}
     end
-  rescue
-    exception ->
-      Logger.error("Exception in LLM request: #{inspect(exception)}")
-      {:error, %{
-        type: "api_error",
-        message: "Internal error: #{Exception.message(exception)}"
-      }}
   end
 
   # Build options for ReqLLM from OpenAI-style request
@@ -123,115 +175,256 @@ defmodule RecLLMGateway.LLMClient do
       "stop", "stream", "user"
     ])
 
+    # Fix: Convert string keys to atoms for custom parameters
     if map_size(custom_params) > 0 do
-      Keyword.merge(opts, Map.to_list(custom_params))
+      custom_opts =
+        custom_params
+        |> Enum.map(fn {key, value} ->
+          # Safely convert string keys to atoms
+          atom_key = if is_binary(key), do: String.to_existing_atom(key), else: key
+          {atom_key, value}
+        end)
+        |> Enum.filter(fn {_k, v} -> not is_nil(v) end)
+
+      Keyword.merge(opts, custom_opts)
     else
       opts
     end
+  rescue
+    ArgumentError ->
+      # If atom doesn't exist, just return opts without custom params
+      Logger.warning("Skipping custom parameters with non-existent atom keys")
+      opts
   end
 
   defp maybe_add_option(opts, _key, nil), do: opts
   defp maybe_add_option(opts, key, value), do: Keyword.put(opts, key, value)
 
   # Transform ReqLLM response to OpenAI-compatible format
-  defp transform_to_openai_format(response, model) do
-    # ReqLLM returns responses in different formats depending on the provider
-    # We need to normalize to OpenAI's format
+  # Enhanced to handle more provider formats explicitly
+  defp transform_to_openai_format(response, model, provider) do
     case response do
       # If ReqLLM already returns OpenAI format (for OpenAI provider)
-      %{"choices" => _choices, "usage" => _usage} = openai_format ->
+      %{"choices" => choices, "usage" => usage} = openai_format
+          when is_list(choices) and is_map(usage) ->
         openai_format
 
-      # If it's a direct text response, wrap it in OpenAI format
-      %{"text" => text} ->
-        %{
-          "id" => generate_id(),
-          "object" => "chat.completion",
-          "created" => System.system_time(:second),
-          "model" => model,
-          "choices" => [
-            %{
-              "index" => 0,
-              "message" => %{
-                "role" => "assistant",
-                "content" => text
-              },
-              "finish_reason" => "stop"
-            }
-          ],
-          "usage" => Map.get(response, "usage", %{
-            "prompt_tokens" => 0,
-            "completion_tokens" => 0,
-            "total_tokens" => 0
-          })
-        }
+      # Handle Anthropic-style responses (content field with structured data)
+      %{"content" => content, "id" => id} = resp when is_list(content) or is_binary(content) ->
+        transform_anthropic_response(resp, model)
 
-      # If response has content field (e.g., from Anthropic)
-      %{"content" => content} = resp ->
-        text_content = extract_text_content(content)
-        usage = Map.get(resp, "usage", %{})
+      # Handle Google Gemini-style responses
+      %{"candidates" => candidates} = resp when is_list(candidates) ->
+        transform_google_response(resp, model)
 
-        %{
-          "id" => Map.get(resp, "id", generate_id()),
-          "object" => "chat.completion",
-          "created" => System.system_time(:second),
-          "model" => model,
-          "choices" => [
-            %{
-              "index" => 0,
-              "message" => %{
-                "role" => "assistant",
-                "content" => text_content
-              },
-              "finish_reason" => map_finish_reason(Map.get(resp, "stop_reason", "stop"))
-            }
-          ],
-          "usage" => %{
-            "prompt_tokens" => Map.get(usage, "input_tokens", 0),
-            "completion_tokens" => Map.get(usage, "output_tokens", 0),
-            "total_tokens" =>
-              Map.get(usage, "input_tokens", 0) + Map.get(usage, "output_tokens", 0)
-          }
-        }
+      # Handle responses with a direct message field
+      %{"message" => %{"content" => content}} = resp ->
+        transform_message_response(resp, model)
 
-      # Fallback for unexpected formats
+      # Handle simple text response (some providers return this)
+      %{"text" => text} when is_binary(text) ->
+        transform_text_response(text, response, model)
+
+      # Handle completion field (used by some providers)
+      %{"completion" => completion} when is_binary(completion) ->
+        transform_text_response(completion, response, model)
+
+      # Fallback: Try to extract any text-like field
       other ->
-        Logger.warning("Unexpected response format from ReqLLM: #{inspect(other)}")
+        Logger.warning("Unexpected response format from #{provider}",
+          provider: provider,
+          model: model,
+          response_keys: Map.keys(other)
+        )
+        transform_fallback_response(other, model)
+    end
+  end
+
+  # Transform Anthropic-style response
+  defp transform_anthropic_response(resp, model) do
+    text_content = extract_text_content(resp["content"])
+    usage = Map.get(resp, "usage", %{})
+
+    %{
+      "id" => Map.get(resp, "id", generate_id()),
+      "object" => "chat.completion",
+      "created" => System.system_time(:second),
+      "model" => model,
+      "choices" => [
         %{
-          "id" => generate_id(),
-          "object" => "chat.completion",
-          "created" => System.system_time(:second),
-          "model" => model,
-          "choices" => [
-            %{
-              "index" => 0,
-              "message" => %{
-                "role" => "assistant",
-                "content" => inspect(other)
-              },
-              "finish_reason" => "stop"
-            }
-          ],
-          "usage" => %{
-            "prompt_tokens" => 0,
-            "completion_tokens" => 0,
-            "total_tokens" => 0
-          }
+          "index" => 0,
+          "message" => %{
+            "role" => "assistant",
+            "content" => text_content
+          },
+          "finish_reason" => map_finish_reason(Map.get(resp, "stop_reason", "stop"))
+        }
+      ],
+      "usage" => %{
+        "prompt_tokens" => Map.get(usage, "input_tokens", 0),
+        "completion_tokens" => Map.get(usage, "output_tokens", 0),
+        "total_tokens" =>
+          Map.get(usage, "input_tokens", 0) + Map.get(usage, "output_tokens", 0)
+      }
+    }
+  end
+
+  # Transform Google Gemini-style response
+  defp transform_google_response(resp, model) do
+    candidates = Map.get(resp, "candidates", [])
+    first_candidate = List.first(candidates) || %{}
+
+    content =
+      first_candidate
+      |> get_in(["content", "parts"])
+      |> extract_text_content()
+
+    usage_metadata = Map.get(resp, "usageMetadata", %{})
+
+    %{
+      "id" => generate_id(),
+      "object" => "chat.completion",
+      "created" => System.system_time(:second),
+      "model" => model,
+      "choices" => [
+        %{
+          "index" => 0,
+          "message" => %{
+            "role" => "assistant",
+            "content" => content
+          },
+          "finish_reason" => map_finish_reason(get_in(first_candidate, ["finishReason"]))
+        }
+      ],
+      "usage" => %{
+        "prompt_tokens" => Map.get(usage_metadata, "promptTokenCount", 0),
+        "completion_tokens" => Map.get(usage_metadata, "candidatesTokenCount", 0),
+        "total_tokens" => Map.get(usage_metadata, "totalTokenCount", 0)
+      }
+    }
+  end
+
+  # Transform message-style response
+  defp transform_message_response(resp, model) do
+    content = get_in(resp, ["message", "content"]) || ""
+
+    %{
+      "id" => Map.get(resp, "id", generate_id()),
+      "object" => "chat.completion",
+      "created" => System.system_time(:second),
+      "model" => model,
+      "choices" => [
+        %{
+          "index" => 0,
+          "message" => %{
+            "role" => "assistant",
+            "content" => content
+          },
+          "finish_reason" => "stop"
+        }
+      ],
+      "usage" => extract_usage(resp)
+    }
+  end
+
+  # Transform simple text response
+  defp transform_text_response(text, response, model) do
+    %{
+      "id" => generate_id(),
+      "object" => "chat.completion",
+      "created" => System.system_time(:second),
+      "model" => model,
+      "choices" => [
+        %{
+          "index" => 0,
+          "message" => %{
+            "role" => "assistant",
+            "content" => text
+          },
+          "finish_reason" => "stop"
+        }
+      ],
+      "usage" => extract_usage(response)
+    }
+  end
+
+  # Fallback transformation for unknown formats
+  defp transform_fallback_response(response, model) do
+    # Try to extract any text content from the response
+    content =
+      cond do
+        is_binary(response) -> response
+        Map.has_key?(response, "output") -> to_string(response["output"])
+        Map.has_key?(response, "result") -> to_string(response["result"])
+        Map.has_key?(response, "response") -> to_string(response["response"])
+        true -> Jason.encode!(response)
+      end
+
+    %{
+      "id" => generate_id(),
+      "object" => "chat.completion",
+      "created" => System.system_time(:second),
+      "model" => model,
+      "choices" => [
+        %{
+          "index" => 0,
+          "message" => %{
+            "role" => "assistant",
+            "content" => content
+          },
+          "finish_reason" => "stop"
+        }
+      ],
+      "usage" => extract_usage(response)
+    }
+  end
+
+  # Extract usage information from various response formats
+  defp extract_usage(response) do
+    case response do
+      %{"usage" => usage} when is_map(usage) ->
+        %{
+          "prompt_tokens" => Map.get(usage, "prompt_tokens", 0),
+          "completion_tokens" => Map.get(usage, "completion_tokens", 0),
+          "total_tokens" => Map.get(usage, "total_tokens", 0)
+        }
+      _ ->
+        %{
+          "prompt_tokens" => 0,
+          "completion_tokens" => 0,
+          "total_tokens" => 0
         }
     end
   end
 
   # Extract text content from various content formats
+  # Enhanced to handle non-text blocks gracefully
   defp extract_text_content(content) when is_binary(content), do: content
   defp extract_text_content([%{"text" => text} | _]), do: text
   defp extract_text_content([%{"type" => "text", "text" => text} | _]), do: text
   defp extract_text_content(content) when is_list(content) do
-    content
-    |> Enum.map(fn
-      %{"text" => text} -> text
-      %{"type" => "text", "text" => text} -> text
-      _ -> ""
-    end)
+    {texts, unhandled} =
+      content
+      |> Enum.reduce({[], []}, fn item, {texts_acc, unhandled_acc} ->
+        case item do
+          %{"type" => "text", "text" => text} ->
+            {[text | texts_acc], unhandled_acc}
+          %{"text" => text} ->
+            {[text | texts_acc], unhandled_acc}
+          other ->
+            {texts_acc, [other | unhandled_acc]}
+        end
+      end)
+
+    # Log warning if we encountered non-text content blocks
+    if unhandled != [] do
+      Logger.warning("Encountered non-text content blocks",
+        unhandled_types: Enum.map(unhandled, &Map.get(&1, "type", "unknown"))
+      )
+    end
+
+    texts
+    |> Enum.reverse()
     |> Enum.join("")
   end
   defp extract_text_content(_), do: ""
@@ -242,20 +435,70 @@ defmodule RecLLMGateway.LLMClient do
   defp map_finish_reason("stop_sequence"), do: "stop"
   defp map_finish_reason("stop"), do: "stop"
   defp map_finish_reason("length"), do: "length"
+  defp map_finish_reason("STOP"), do: "stop"
+  defp map_finish_reason("MAX_TOKENS"), do: "length"
+  defp map_finish_reason(nil), do: "stop"
   defp map_finish_reason(_), do: "stop"
 
   # Transform ReqLLM errors to OpenAI-compatible format
-  defp transform_error(reason) when is_binary(reason) do
-    %{type: "api_error", message: reason}
+  # Enhanced to preserve error types from ReqLLM.Error structs
+  defp transform_error(%{__struct__: struct_name, type: type, message: message}, provider, model)
+      when struct_name == ReqLLM.Error do
+    Logger.error("ReqLLM error",
+      provider: provider,
+      model: model,
+      error_type: type,
+      message: message
+    )
+
+    %{
+      type: Atom.to_string(type),
+      message: message,
+      provider: provider,
+      model: model
+    }
   end
 
-  defp transform_error(%{message: message}) do
-    %{type: "api_error", message: message}
+  defp transform_error(%{type: type, message: message}, provider, model) when is_atom(type) do
+    %{
+      type: Atom.to_string(type),
+      message: message,
+      provider: provider,
+      model: model
+    }
   end
 
-  defp transform_error(reason) do
-    %{type: "api_error", message: inspect(reason)}
+  defp transform_error(%{message: message}, provider, model) do
+    %{
+      type: "api_error",
+      message: message,
+      provider: provider,
+      model: model
+    }
   end
+
+  defp transform_error(reason, provider, model) when is_binary(reason) do
+    %{
+      type: "api_error",
+      message: reason,
+      provider: provider,
+      model: model
+    }
+  end
+
+  defp transform_error(reason, provider, model) do
+    %{
+      type: "api_error",
+      message: "Request failed: #{inspect(reason)}",
+      provider: provider,
+      model: model
+    }
+  end
+
+  # Helper to get error type for logging
+  defp error_type(%{__struct__: ReqLLM.Error, type: type}), do: type
+  defp error_type(%{type: type}), do: type
+  defp error_type(_), do: :unknown
 
   # Generate a unique ID for responses
   defp generate_id do
