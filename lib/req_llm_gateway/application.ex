@@ -1,4 +1,4 @@
-defmodule RecLLMGateway.Application do
+defmodule ReqLLMGateway.Application do
   @moduledoc false
 
   use Application
@@ -7,7 +7,7 @@ defmodule RecLLMGateway.Application do
   def start(_type, _args) do
     children = [
       # Start the Usage ETS table
-      RecLLMGateway.Usage,
+      ReqLLMGateway.Usage,
 
       # Start telemetry poller
       {:telemetry_poller, measurements: periodic_measurements(), period: 10_000},
@@ -15,13 +15,13 @@ defmodule RecLLMGateway.Application do
       # Start the Plug.Cowboy server
       {Plug.Cowboy,
        scheme: :http,
-       plug: RecLLMGateway.Plug,
+       plug: ReqLLMGateway.Plug,
        options: [
-         port: Application.get_env(:rec_llm_gateway, :port, 4000)
+         port: Application.get_env(:req_llm_gateway, :port, 4000)
        ]}
     ]
 
-    opts = [strategy: :one_for_one, name: RecLLMGateway.Supervisor]
+    opts = [strategy: :one_for_one, name: ReqLLMGateway.Supervisor]
     Supervisor.start_link(children, opts)
   end
 

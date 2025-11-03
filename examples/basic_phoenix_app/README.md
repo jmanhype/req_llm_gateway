@@ -1,6 +1,6 @@
 # Basic Phoenix App Example
 
-This example shows how to integrate RecLLMGateway into a new Phoenix application.
+This example shows how to integrate ReqLLMGateway into a new Phoenix application.
 
 ## Setup
 
@@ -11,13 +11,13 @@ mix phx.new my_app --no-ecto
 cd my_app
 ```
 
-2. Add RecLLMGateway to `mix.exs`:
+2. Add ReqLLMGateway to `mix.exs`:
 
 ```elixir
 defp deps do
   [
     {:phoenix, "~> 1.7.0"},
-    {:rec_llm_gateway, "~> 0.1.0"}  # Add this
+    {:req_llm_gateway, "~> 0.1.0"}  # Add this
   ]
 end
 ```
@@ -33,7 +33,7 @@ mix deps.get
 Add to `config/config.exs`:
 
 ```elixir
-config :rec_llm_gateway,
+config :req_llm_gateway,
   api_keys: %{
     "openai" => System.get_env("OPENAI_API_KEY"),
     "anthropic" => System.get_env("ANTHROPIC_API_KEY")
@@ -63,7 +63,7 @@ defmodule MyAppWeb.Router do
 
   scope "/v1", MyAppWeb do
     pipe_through :api
-    forward "/chat/completions", RecLLMGateway.Plug
+    forward "/chat/completions", ReqLLMGateway.Plug
   end
 
   # Optional: Add LiveDashboard
@@ -75,7 +75,7 @@ defmodule MyAppWeb.Router do
     live_dashboard "/dashboard",
       metrics: MyAppWeb.Telemetry,
       additional_pages: [
-        rec_llm: RecLLMGateway.LiveDashboard
+        req_llm: ReqLLMGateway.LiveDashboard
       ]
   end
 end
@@ -101,7 +101,7 @@ curl http://localhost:4000/v1/chat/completions \
   }'
 ```
 
-View stats at: `http://localhost:4000/dashboard/rec_llm`
+View stats at: `http://localhost:4000/dashboard/req_llm`
 
 ## Next Steps
 

@@ -1,10 +1,10 @@
-# RecLLMGateway
+# ReqLLMGateway
 
 **OpenAI-compatible LLM proxy. Drop into Phoenix. Done.**
 
 ```elixir
 # In your router.ex
-forward "/v1/chat/completions", RecLLMGateway.Plug
+forward "/v1/chat/completions", ReqLLMGateway.Plug
 ```
 
 That's it. You now have a production-ready LLM gateway.
@@ -17,7 +17,7 @@ That's it. You now have a production-ready LLM gateway.
 - ✅ **Built-in telemetry** - Emit events for observability
 - ✅ **Usage tracking** - ETS-backed stats (no database needed)
 - ✅ **Automatic cost tracking** - ReqLLM knows pricing for all models
-- ✅ **LiveDashboard** - See usage stats at `/dashboard/rec_llm`
+- ✅ **LiveDashboard** - See usage stats at `/dashboard/req_llm`
 
 ## Installation
 
@@ -26,7 +26,7 @@ Add to `mix.exs`:
 ```elixir
 def deps do
   [
-    {:rec_llm_gateway, "~> 0.1.0"}
+    {:req_llm_gateway, "~> 0.1.0"}
   ]
 end
 ```
@@ -59,13 +59,13 @@ config :req_llm,
 ```elixir
 # lib/my_app_web/router.ex
 scope "/v1" do
-  forward "/chat/completions", RecLLMGateway.Plug
+  forward "/chat/completions", ReqLLMGateway.Plug
 end
 
 # Add LiveDashboard page
 live_dashboard "/dashboard",
   additional_pages: [
-    rec_llm: RecLLMGateway.LiveDashboard
+    req_llm: ReqLLMGateway.LiveDashboard
   ]
 ```
 
@@ -82,7 +82,7 @@ curl http://localhost:4000/v1/chat/completions \
 
 ## Model Routing
 
-RecLLMGateway supports 45+ providers via ReqLLM:
+ReqLLMGateway supports 45+ providers via ReqLLM:
 
 **Specify provider explicitly:**
 ```json
@@ -111,7 +111,7 @@ Standard OpenAI response + optional extensions:
 {
   "choices": [...],
   "usage": {"prompt_tokens": 10, "completion_tokens": 20},
-  "x_rec_llm": {
+  "x_req_llm": {
     "provider": "openai",
     "latency_ms": 342,
     "cost_usd": 0.000063
@@ -137,12 +137,12 @@ response = client.chat.completions.create(
 ## Configuration Options
 
 ```elixir
-# RecLLMGateway config
-config :rec_llm_gateway,
+# ReqLLMGateway config
+config :req_llm_gateway,
   # Default provider when model has no prefix (default: "openai")
   default_provider: "openai",
 
-  # Include x_rec_llm extension in responses (default: true)
+  # Include x_req_llm extension in responses (default: true)
   include_extensions: true,
 
   # Optional gateway authentication
@@ -161,7 +161,7 @@ config :req_llm,
 Stats are automatically tracked in ETS:
 
 ```elixir
-RecLLMGateway.Usage.get_all()
+ReqLLMGateway.Usage.get_all()
 #=> [
 #  %{
 #    date: ~D[2024-01-15],
@@ -175,15 +175,15 @@ RecLLMGateway.Usage.get_all()
 #]
 ```
 
-Or view in LiveDashboard at `/dashboard/rec_llm`.
+Or view in LiveDashboard at `/dashboard/req_llm`.
 
 ## Telemetry
 
 Emits standard telemetry events:
 
-- `[:rec_llm_gateway, :request, :start]`
-- `[:rec_llm_gateway, :request, :stop]` - includes tokens, latency
-- `[:rec_llm_gateway, :request, :exception]`
+- `[:req_llm_gateway, :request, :start]`
+- `[:req_llm_gateway, :request, :stop]` - includes tokens, latency
+- `[:req_llm_gateway, :request, :exception]`
 
 Hook into your existing observability stack.
 
@@ -193,7 +193,7 @@ Mock the LLM client in tests:
 
 ```elixir
 # config/test.exs
-config :rec_llm_gateway,
+config :req_llm_gateway,
   llm_client: MyApp.LLMClientMock
 ```
 

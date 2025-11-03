@@ -1,6 +1,6 @@
 # Testing Strategies
 
-Learn how to test applications using RecLLMGateway without making real API calls.
+Learn how to test applications using ReqLLMGateway without making real API calls.
 
 ## Configuration for Tests
 
@@ -9,7 +9,7 @@ In `config/test.exs`, mock the LLM client:
 ```elixir
 import Config
 
-config :rec_llm_gateway,
+config :req_llm_gateway,
   llm_client: MyApp.LLMClientMock,
   api_keys: %{
     "openai" => "test-key"
@@ -39,7 +39,7 @@ Mox.defmock(MyApp.LLMClientMock, for: MyApp.LLMClientBehaviour)
 
 ```elixir
 # config/test.exs
-config :rec_llm_gateway,
+config :req_llm_gateway,
   llm_client: MyApp.LLMClientMock
 ```
 
@@ -84,7 +84,7 @@ defmodule MyAppTest do
       "messages" => [%{"role" => "user", "content" => "Hello!"}]
     })
 
-    conn = RecLLMGateway.Plug.call(conn, [])
+    conn = ReqLLMGateway.Plug.call(conn, [])
 
     # Assert response
     assert conn.status == 200
@@ -100,7 +100,7 @@ For integration tests, you can use a test provider:
 
 ```elixir
 # config/test.exs
-config :rec_llm_gateway,
+config :req_llm_gateway,
   api_keys: %{
     "test" => "test-key"
   },
@@ -140,7 +140,7 @@ defmodule MyApp.TelemetryTest do
 
     :telemetry.attach(
       "test-handler",
-      [:rec_llm_gateway, :request, :stop],
+      [:req_llm_gateway, :request, :stop],
       fn event, measurements, metadata, _config ->
         send(test_pid, {:telemetry, event, measurements, metadata})
       end,
@@ -158,7 +158,7 @@ defmodule MyApp.TelemetryTest do
     # Make request...
 
     # Assert telemetry event
-    assert_receive {:telemetry, [:rec_llm_gateway, :request, :stop], measurements, metadata}
+    assert_receive {:telemetry, [:req_llm_gateway, :request, :stop], measurements, metadata}
     assert measurements.duration > 0
     assert measurements.total_tokens == 30
     assert metadata.provider == "openai"
@@ -171,12 +171,12 @@ end
 ```elixir
 test "tracks usage statistics" do
   # Clear stats
-  RecLLMGateway.Usage.clear()
+  ReqLLMGateway.Usage.clear()
 
   # Make request...
 
   # Check stats
-  stats = RecLLMGateway.Usage.get_all()
+  stats = ReqLLMGateway.Usage.get_all()
   assert length(stats) == 1
 
   stat = hd(stats)
@@ -200,7 +200,7 @@ test "handles provider errors gracefully" do
     "messages" => [%{"role" => "user", "content" => "Hello!"}]
   })
 
-  conn = RecLLMGateway.Plug.call(conn, [])
+  conn = ReqLLMGateway.Plug.call(conn, [])
 
   assert conn.status == 500
   response = Jason.decode!(conn.resp_body)
@@ -230,7 +230,7 @@ defmodule MyApp.IntegrationTest do
         "messages" => [%{"role" => "user", "content" => "Say hello"}]
       })
 
-      conn = RecLLMGateway.Plug.call(conn, [])
+      conn = ReqLLMGateway.Plug.call(conn, [])
 
       assert conn.status == 200
       response = Jason.decode!(conn.resp_body)
@@ -246,5 +246,5 @@ end
 2. **Use ExVCR for integration tests** - Real responses, but cached
 3. **Test error cases** - API failures, invalid models, missing keys
 4. **Test telemetry** - Ensure observability hooks work correctly
-5. **Clear usage stats** - Call `RecLLMGateway.Usage.clear()` in setup
+5. **Clear usage stats** - Call `ReqLLMGateway.Usage.clear()` in setup
 6. **Async tests** - Most tests can run `async: true` with proper mocking

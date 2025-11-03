@@ -1,4 +1,4 @@
-defmodule RecLLMGateway.ModelParser do
+defmodule ReqLLMGateway.ModelParser do
   @moduledoc """
   Parses model identifiers to extract provider and model name.
 
@@ -10,20 +10,20 @@ defmodule RecLLMGateway.ModelParser do
 
   ## Examples
 
-      iex> RecLLMGateway.ModelParser.parse("openai:gpt-4")
+      iex> ReqLLMGateway.ModelParser.parse("openai:gpt-4")
       {:ok, "openai", "gpt-4"}
 
-      iex> RecLLMGateway.ModelParser.parse("anthropic:claude-3-sonnet-20240229")
+      iex> ReqLLMGateway.ModelParser.parse("anthropic:claude-3-sonnet-20240229")
       {:ok, "anthropic", "claude-3-sonnet-20240229"}
 
-      iex> RecLLMGateway.ModelParser.parse("gpt-4")
+      iex> ReqLLMGateway.ModelParser.parse("gpt-4")
       {:ok, "openai", "gpt-4"}
 
-      iex> RecLLMGateway.ModelParser.parse("")
+      iex> ReqLLMGateway.ModelParser.parse("")
       {:error, %{type: "invalid_request_error", message: "Model cannot be empty", code: "invalid_model"}}
   """
 
-  @default_provider Application.compile_env(:rec_llm_gateway, :default_provider, "openai")
+  @default_provider Application.compile_env(:req_llm_gateway, :default_provider, "openai")
 
   @doc """
   Parses a model string into provider and model components.

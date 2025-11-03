@@ -1,10 +1,10 @@
 # Telemetry & Monitoring
 
-RecLLMGateway emits comprehensive telemetry events for observability and monitoring.
+ReqLLMGateway emits comprehensive telemetry events for observability and monitoring.
 
 ## Telemetry Events
 
-### `[:rec_llm_gateway, :request, :start]`
+### `[:req_llm_gateway, :request, :start]`
 
 Emitted when a request begins.
 
@@ -19,7 +19,7 @@ Emitted when a request begins.
 }
 ```
 
-### `[:rec_llm_gateway, :request, :stop]`
+### `[:req_llm_gateway, :request, :stop]`
 
 Emitted when a request completes successfully.
 
@@ -43,7 +43,7 @@ Emitted when a request completes successfully.
 }
 ```
 
-### `[:rec_llm_gateway, :request, :exception]`
+### `[:req_llm_gateway, :request, :exception]`
 
 Emitted when a request fails.
 
@@ -68,7 +68,7 @@ Emitted when a request fails.
 ```elixir
 :telemetry.attach(
   "my-handler",
-  [:rec_llm_gateway, :request, :stop],
+  [:req_llm_gateway, :request, :stop],
   fn event, measurements, metadata, _config ->
     IO.inspect({event, measurements, metadata})
   end,
@@ -86,20 +86,20 @@ defmodule MyApp.Telemetry do
     :telemetry.attach_many(
       "my-app-rec-llm-handler",
       [
-        [:rec_llm_gateway, :request, :start],
-        [:rec_llm_gateway, :request, :stop],
-        [:rec_llm_gateway, :request, :exception]
+        [:req_llm_gateway, :request, :start],
+        [:req_llm_gateway, :request, :stop],
+        [:req_llm_gateway, :request, :exception]
       ],
       &handle_event/4,
       nil
     )
   end
 
-  def handle_event([:rec_llm_gateway, :request, :start], _measurements, metadata, _config) do
+  def handle_event([:req_llm_gateway, :request, :start], _measurements, metadata, _config) do
     Logger.info("LLM request started: #{metadata.provider}:#{metadata.model}")
   end
 
-  def handle_event([:rec_llm_gateway, :request, :stop], measurements, metadata, _config) do
+  def handle_event([:req_llm_gateway, :request, :stop], measurements, metadata, _config) do
     duration_ms = measurements.duration / 1_000_000
 
     Logger.info(
@@ -109,7 +109,7 @@ defmodule MyApp.Telemetry do
     )
   end
 
-  def handle_event([:rec_llm_gateway, :request, :exception], _measurements, metadata, _config) do
+  def handle_event([:req_llm_gateway, :request, :exception], _measurements, metadata, _config) do
     Logger.error("LLM request failed: #{metadata.provider}:#{metadata.model} " <>
                  "reason=#{inspect(metadata.reason)}")
   end
@@ -156,31 +156,31 @@ defmodule MyApp.PrometheusTelemetry do
   defp metrics do
     [
       # Request count
-      Metrics.counter("rec_llm_gateway.request.count",
+      Metrics.counter("req_llm_gateway.request.count",
         tags: [:provider, :model]
       ),
 
       # Request duration
-      Metrics.distribution("rec_llm_gateway.request.duration",
+      Metrics.distribution("req_llm_gateway.request.duration",
         unit: {:native, :millisecond},
         tags: [:provider, :model],
         reporter_options: [buckets: [10, 100, 500, 1000, 5000]]
       ),
 
       # Token usage
-      Metrics.sum("rec_llm_gateway.request.tokens",
+      Metrics.sum("req_llm_gateway.request.tokens",
         measurement: :total_tokens,
         tags: [:provider, :model]
       ),
 
       # Cost tracking
-      Metrics.sum("rec_llm_gateway.request.cost",
+      Metrics.sum("req_llm_gateway.request.cost",
         measurement: :cost_usd,
         tags: [:provider, :model]
       ),
 
       # Error count
-      Metrics.counter("rec_llm_gateway.request.exception.count",
+      Metrics.counter("req_llm_gateway.request.exception.count",
         tags: [:provider, :model]
       )
     ]
@@ -202,7 +202,7 @@ defmodule MyApp.StatsDTelemetry do
   def setup do
     :telemetry.attach(
       "my-app-statsd",
-      [:rec_llm_gateway, :request, :stop],
+      [:req_llm_gateway, :request, :stop],
       &handle_event/4,
       nil
     )
@@ -234,7 +234,7 @@ defmodule MyApp.LLMMetrics do
   def init(_) do
     :telemetry.attach(
       "llm-metrics",
-      [:rec_llm_gateway, :request, :stop],
+      [:req_llm_gateway, :request, :stop],
       &handle_telemetry/4,
       nil
     )
@@ -269,14 +269,14 @@ end
 
 ## LiveDashboard Integration
 
-RecLLMGateway includes a built-in LiveDashboard page:
+ReqLLMGateway includes a built-in LiveDashboard page:
 
 ```elixir
 # router.ex
 live_dashboard "/dashboard",
   additional_pages: [
-    rec_llm: RecLLMGateway.LiveDashboard
+    req_llm: ReqLLMGateway.LiveDashboard
   ]
 ```
 
-View at `http://localhost:4000/dashboard/rec_llm`.
+View at `http://localhost:4000/dashboard/req_llm`.

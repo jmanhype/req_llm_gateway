@@ -1,19 +1,19 @@
 import Config
 
-# RecLLMGateway configuration
-config :rec_llm_gateway,
+# ReqLLMGateway configuration
+config :req_llm_gateway,
   # Server port
   port: 4000,
 
   # Default provider when model is specified without prefix
   default_provider: "openai",
 
-  # Include x_rec_llm extension in responses
+  # Include x_req_llm extension in responses
   include_extensions: true,
 
   # Optional API key for gateway authentication
   # Set to nil to disable authentication
-  # api_key: System.get_env("REC_LLM_GATEWAY_KEY"),
+  # api_key: System.get_env("REQ_LLM_GATEWAY_KEY"),
   api_key: nil,
 
   # Provider API keys

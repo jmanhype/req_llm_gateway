@@ -1,4 +1,4 @@
-defmodule RecLLMGateway.LLMClient do
+defmodule ReqLLMGateway.LLMClient do
   @moduledoc """
   Behaviour and implementation for LLM API clients using ReqLLM.
 
@@ -41,9 +41,9 @@ defmodule RecLLMGateway.LLMClient do
 
   The module uses ReqLLM's `provider:model` syntax:
 
-      RecLLMGateway.LLMClient.chat_completion("openai", "gpt-4", request)
-      RecLLMGateway.LLMClient.chat_completion("anthropic", "claude-3-opus-20240229", request)
-      RecLLMGateway.LLMClient.chat_completion("google", "gemini-pro", request)
+      ReqLLMGateway.LLMClient.chat_completion("openai", "gpt-4", request)
+      ReqLLMGateway.LLMClient.chat_completion("anthropic", "claude-3-opus-20240229", request)
+      ReqLLMGateway.LLMClient.chat_completion("google", "gemini-pro", request)
 
   ## Features
 

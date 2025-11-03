@@ -1,4 +1,4 @@
-defmodule RecLLMGateway.Mocks do
+defmodule ReqLLMGateway.Mocks do
   @moduledoc """
   Mock definitions for testing.
   """

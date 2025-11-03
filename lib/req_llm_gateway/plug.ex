@@ -1,4 +1,4 @@
-defmodule RecLLMGateway.Plug do
+defmodule ReqLLMGateway.Plug do
   @moduledoc """
   OpenAI-compatible gateway plug with telemetry, usage tracking, and multi-provider routing.
 
@@ -57,19 +57,19 @@ defmodule RecLLMGateway.Plug do
     with :ok <- ensure_auth(conn),
          {:ok, request} <- validate_request(conn.body_params),
          :ok <- reject_streaming(request),
-         {:ok, provider, model} <- RecLLMGateway.ModelParser.parse(request["model"]),
-         :ok <- RecLLMGateway.Telemetry.emit_start(provider, model),
+         {:ok, provider, model} <- ReqLLMGateway.ModelParser.parse(request["model"]),
+         :ok <- ReqLLMGateway.Telemetry.emit_start(provider, model),
          {:ok, resp0} <- call_llm(provider, model, request),
          response <- ensure_openai_shape(resp0),
          duration_native <- System.monotonic_time() - start_native,
          latency_ms <- System.convert_time_unit(duration_native, :native, :millisecond),
          response <- maybe_add_extensions(response, provider, latency_ms),
          :ok <- record_usage(response, provider, latency_ms) do
-      RecLLMGateway.Telemetry.emit_stop(request, response, provider, duration_native)
+      ReqLLMGateway.Telemetry.emit_stop(request, response, provider, duration_native)
       send_json(conn, 200, response)
     else
       {:error, error} ->
-        RecLLMGateway.Telemetry.emit_exception(error)
+        ReqLLMGateway.Telemetry.emit_exception(error)
         {status, body} = format_error(error)
         send_json(conn, status, body)
     end
@@ -78,7 +78,7 @@ defmodule RecLLMGateway.Plug do
   # --- Authentication ---
 
   defp ensure_auth(conn) do
-    case Application.get_env(:rec_llm_gateway, :api_key) do
+    case Application.get_env(:req_llm_gateway, :api_key) do
       nil ->
         :ok
 
@@ -137,7 +137,7 @@ defmodule RecLLMGateway.Plug do
   defp call_llm(provider, model, request) do
     # This will call the RecLLM adapter - for now, we'll stub it
     # In production, this would be: RecLLM.chat_completion(provider, model, request)
-    adapter = Application.get_env(:rec_llm_gateway, :llm_client, RecLLMGateway.LLMClient)
+    adapter = Application.get_env(:req_llm_gateway, :llm_client, ReqLLMGateway.LLMClient)
     adapter.chat_completion(provider, model, request)
   end
 
@@ -151,10 +151,10 @@ defmodule RecLLMGateway.Plug do
   end
 
   defp maybe_add_extensions(response, provider, latency_ms) do
-    if Application.get_env(:rec_llm_gateway, :include_extensions, true) do
-      cost = RecLLMGateway.Pricing.calculate(response["model"], response["usage"] || %{})
+    if Application.get_env(:req_llm_gateway, :include_extensions, true) do
+      cost = ReqLLMGateway.Pricing.calculate(response["model"], response["usage"] || %{})
 
-      Map.put(response, "x_rec_llm", %{
+      Map.put(response, "x_req_llm", %{
         "provider" => provider,
         "latency_ms" => latency_ms,
         "cost_usd" => cost
@@ -165,9 +165,9 @@ defmodule RecLLMGateway.Plug do
   end
 
   defp record_usage(response, provider, latency_ms) do
-    cost = get_in(response, ["x_rec_llm", "cost_usd"])
+    cost = get_in(response, ["x_req_llm", "cost_usd"])
     usage = Map.put(response["usage"] || %{}, "cost_usd", cost)
-    RecLLMGateway.Usage.record(provider, response["model"], usage, latency_ms)
+    ReqLLMGateway.Usage.record(provider, response["model"], usage, latency_ms)
   end
 
   # --- Error handling ---

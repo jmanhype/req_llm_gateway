@@ -1,25 +1,25 @@
-defmodule RecLLMGateway.Telemetry do
+defmodule ReqLLMGateway.Telemetry do
   @moduledoc """
   Telemetry event emission and metrics definitions.
 
   ## Events
 
-  - `[:rec_llm_gateway, :request, :start]` - Emitted when a request starts
+  - `[:req_llm_gateway, :request, :start]` - Emitted when a request starts
     - Measurements: `%{system_time: integer}`
     - Metadata: `%{provider: string, model: string}`
 
-  - `[:rec_llm_gateway, :request, :stop]` - Emitted when a request completes
+  - `[:req_llm_gateway, :request, :stop]` - Emitted when a request completes
     - Measurements: `%{duration: native_time, prompt_tokens: integer, completion_tokens: integer, total_tokens: integer}`
     - Metadata: `%{provider: string, model: string, finish_reason: string}`
 
-  - `[:rec_llm_gateway, :request, :exception]` - Emitted when a request fails
+  - `[:req_llm_gateway, :request, :exception]` - Emitted when a request fails
     - Measurements: `%{}`
     - Metadata: `%{error: string}`
   """
 
   def emit_start(provider, model) do
     :telemetry.execute(
-      [:rec_llm_gateway, :request, :start],
+      [:req_llm_gateway, :request, :start],
       %{system_time: System.system_time()},
       %{provider: provider, model: model}
     )
@@ -35,7 +35,7 @@ defmodule RecLLMGateway.Telemetry do
     usage = Map.get(response, "usage", %{})
 
     :telemetry.execute(
-      [:rec_llm_gateway, :request, :stop],
+      [:req_llm_gateway, :request, :stop],
       %{
         duration: duration_native,
         prompt_tokens: Map.get(usage, "prompt_tokens", 0),
@@ -52,7 +52,7 @@ defmodule RecLLMGateway.Telemetry do
 
   def emit_exception(error) do
     :telemetry.execute(
-      [:rec_llm_gateway, :request, :exception],
+      [:req_llm_gateway, :request, :exception],
       %{},
       %{error: inspect(error)}
     )
@@ -67,30 +67,30 @@ defmodule RecLLMGateway.Telemetry do
   def metrics do
     [
       # Request counters
-      Telemetry.Metrics.counter("rec_llm_gateway.request.stop.count",
+      Telemetry.Metrics.counter("req_llm_gateway.request.stop.count",
         tags: [:provider, :model]
       ),
-      Telemetry.Metrics.counter("rec_llm_gateway.request.exception.count",
+      Telemetry.Metrics.counter("req_llm_gateway.request.exception.count",
         tags: [:error]
       ),
 
       # Token sums
-      Telemetry.Metrics.sum("rec_llm_gateway.request.stop.prompt_tokens",
+      Telemetry.Metrics.sum("req_llm_gateway.request.stop.prompt_tokens",
         tags: [:provider, :model]
       ),
-      Telemetry.Metrics.sum("rec_llm_gateway.request.stop.completion_tokens",
+      Telemetry.Metrics.sum("req_llm_gateway.request.stop.completion_tokens",
         tags: [:provider, :model]
       ),
-      Telemetry.Metrics.sum("rec_llm_gateway.request.stop.total_tokens",
+      Telemetry.Metrics.sum("req_llm_gateway.request.stop.total_tokens",
         tags: [:provider, :model]
       ),
 
       # Latency metrics (native -> millisecond conversion)
-      Telemetry.Metrics.summary("rec_llm_gateway.request.stop.duration",
+      Telemetry.Metrics.summary("req_llm_gateway.request.stop.duration",
         unit: {:native, :millisecond},
         tags: [:provider, :model]
       ),
-      Telemetry.Metrics.distribution("rec_llm_gateway.request.stop.duration",
+      Telemetry.Metrics.distribution("req_llm_gateway.request.stop.duration",
         unit: {:native, :millisecond},
         reporter_options: [buckets: [100, 250, 500, 1000, 2500, 5000]],
         tags: [:provider, :model]

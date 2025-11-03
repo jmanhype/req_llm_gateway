@@ -1,17 +1,17 @@
-defmodule RecLLMGateway.PlugTest do
+defmodule ReqLLMGateway.PlugTest do
   use ExUnit.Case, async: true
   use Plug.Test
 
   import Mox
 
-  alias RecLLMGateway.Plug, as: GatewayPlug
+  alias ReqLLMGateway.Plug, as: GatewayPlug
 
   setup :verify_on_exit!
 
   setup do
     # Start Usage for tests
-    start_supervised!(RecLLMGateway.Usage)
-    RecLLMGateway.Usage.clear_all()
+    start_supervised!(ReqLLMGateway.Usage)
+    ReqLLMGateway.Usage.clear_all()
     :ok
   end
 
@@ -36,7 +36,7 @@ defmodule RecLLMGateway.PlugTest do
         }
       }
 
-      expect(RecLLMGateway.LLMClientMock, :chat_completion, fn "openai", "gpt-4", _request ->
+      expect(ReqLLMGateway.LLMClientMock, :chat_completion, fn "openai", "gpt-4", _request ->
         {:ok, mock_response}
       end)
 
@@ -56,9 +56,9 @@ defmodule RecLLMGateway.PlugTest do
       assert response["id"]
       assert response["choices"]
       assert response["usage"]
-      assert response["x_rec_llm"]["provider"] == "openai"
-      assert response["x_rec_llm"]["latency_ms"]
-      assert response["x_rec_llm"]["cost_usd"]
+      assert response["x_req_llm"]["provider"] == "openai"
+      assert response["x_req_llm"]["latency_ms"]
+      assert response["x_req_llm"]["cost_usd"]
     end
 
     test "rejects stream=true with proper error" do
@@ -125,7 +125,7 @@ defmodule RecLLMGateway.PlugTest do
       }
 
       expect(
-        RecLLMGateway.LLMClientMock,
+        ReqLLMGateway.LLMClientMock,
         :chat_completion,
         fn "anthropic", "claude-3-sonnet", _request ->
           {:ok, mock_response}
@@ -144,7 +144,7 @@ defmodule RecLLMGateway.PlugTest do
 
       assert conn.status == 200
       response = Jason.decode!(conn.resp_body)
-      assert response["x_rec_llm"]["provider"] == "anthropic"
+      assert response["x_req_llm"]["provider"] == "anthropic"
     end
   end
 
@@ -181,7 +181,7 @@ defmodule RecLLMGateway.PlugTest do
 
   describe "error status mapping" do
     test "maps authentication_error to 401" do
-      expect(RecLLMGateway.LLMClientMock, :chat_completion, fn _, _, _ ->
+      expect(ReqLLMGateway.LLMClientMock, :chat_completion, fn _, _, _ ->
         {:error, %{type: "authentication_error", message: "Invalid API key"}}
       end)
 
@@ -199,7 +199,7 @@ defmodule RecLLMGateway.PlugTest do
     end
 
     test "maps rate_limit_error to 429" do
-      expect(RecLLMGateway.LLMClientMock, :chat_completion, fn _, _, _ ->
+      expect(ReqLLMGateway.LLMClientMock, :chat_completion, fn _, _, _ ->
         {:error, %{type: "rate_limit_error", message: "Rate limit exceeded"}}
       end)
 
@@ -217,7 +217,7 @@ defmodule RecLLMGateway.PlugTest do
     end
 
     test "maps timeout_error to 504" do
-      expect(RecLLMGateway.LLMClientMock, :chat_completion, fn _, _, _ ->
+      expect(ReqLLMGateway.LLMClientMock, :chat_completion, fn _, _, _ ->
         {:error, %{type: "timeout_error", message: "Request timeout"}}
       end)
 
@@ -235,7 +235,7 @@ defmodule RecLLMGateway.PlugTest do
     end
 
     test "maps api_error to 500" do
-      expect(RecLLMGateway.LLMClientMock, :chat_completion, fn _, _, _ ->
+      expect(ReqLLMGateway.LLMClientMock, :chat_completion, fn _, _, _ ->
         {:error, %{type: "api_error", message: "Internal server error"}}
       end)
 

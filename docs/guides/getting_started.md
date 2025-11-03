@@ -1,6 +1,6 @@
 # Getting Started
 
-This guide will help you get RecLLMGateway up and running in your Elixir/Phoenix application.
+This guide will help you get ReqLLMGateway up and running in your Elixir/Phoenix application.
 
 ## Prerequisites
 
@@ -10,12 +10,12 @@ This guide will help you get RecLLMGateway up and running in your Elixir/Phoenix
 
 ## Installation
 
-Add RecLLMGateway to your `mix.exs` dependencies:
+Add ReqLLMGateway to your `mix.exs` dependencies:
 
 ```elixir
 def deps do
   [
-    {:rec_llm_gateway, "~> 0.1.0"}
+    {:req_llm_gateway, "~> 0.1.0"}
   ]
 end
 ```
@@ -28,7 +28,7 @@ mix deps.get
 
 ## Configuration
 
-RecLLMGateway uses ReqLLM under the hood, which automatically picks up API keys from environment variables.
+ReqLLMGateway uses ReqLLM under the hood, which automatically picks up API keys from environment variables.
 
 ### Environment Variables (Recommended)
 
@@ -55,8 +55,8 @@ config :req_llm,
   anthropic_api_key: System.get_env("ANTHROPIC_API_KEY"),
   google_api_key: System.get_env("GOOGLE_API_KEY")
 
-# RecLLMGateway settings
-config :rec_llm_gateway,
+# ReqLLMGateway settings
+config :req_llm_gateway,
   default_provider: "openai",
   include_extensions: true
 ```
@@ -67,7 +67,7 @@ In your Phoenix router (`lib/my_app_web/router.ex`), add:
 
 ```elixir
 scope "/v1" do
-  forward "/chat/completions", RecLLMGateway.Plug
+  forward "/chat/completions", ReqLLMGateway.Plug
 end
 ```
 
@@ -87,16 +87,16 @@ scope "/" do
   live_dashboard "/dashboard",
     metrics: MyAppWeb.Telemetry,
     additional_pages: [
-      rec_llm: RecLLMGateway.LiveDashboard
+      req_llm: ReqLLMGateway.LiveDashboard
     ]
 end
 ```
 
-View stats at `http://localhost:4000/dashboard/rec_llm`.
+View stats at `http://localhost:4000/dashboard/req_llm`.
 
 ## Testing Your Setup
 
-RecLLMGateway supports 45+ providers via ReqLLM. Here are some examples:
+ReqLLMGateway supports 45+ providers via ReqLLM. Here are some examples:
 
 ### Using curl
 

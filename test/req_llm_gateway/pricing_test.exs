@@ -1,7 +1,7 @@
-defmodule RecLLMGateway.PricingTest do
+defmodule ReqLLMGateway.PricingTest do
   use ExUnit.Case, async: true
 
-  alias RecLLMGateway.Pricing
+  alias ReqLLMGateway.Pricing
 
   describe "calculate/2" do
     test "calculates cost for gpt-4" do

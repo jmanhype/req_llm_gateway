@@ -1,4 +1,4 @@
-defmodule RecLLMGateway.Pricing do
+defmodule ReqLLMGateway.Pricing do
   @moduledoc """
   Calculates costs based on token usage and model pricing.
 
@@ -7,7 +7,7 @@ defmodule RecLLMGateway.Pricing do
 
   ## Configuration
 
-      config :rec_llm_gateway, :pricing, %{
+      config :req_llm_gateway, :pricing, %{
         "gpt-4" => %{input: 30.0, output: 60.0},
         "gpt-4-turbo" => %{input: 10.0, output: 30.0},
         # ... more models
@@ -16,10 +16,10 @@ defmodule RecLLMGateway.Pricing do
   ## Examples
 
       iex> usage = %{"prompt_tokens" => 1000, "completion_tokens" => 500}
-      iex> RecLLMGateway.Pricing.calculate("gpt-4", usage)
+      iex> ReqLLMGateway.Pricing.calculate("gpt-4", usage)
       0.06
 
-      iex> RecLLMGateway.Pricing.calculate("unknown-model", %{})
+      iex> ReqLLMGateway.Pricing.calculate("unknown-model", %{})
       nil
   """
 
@@ -74,7 +74,7 @@ defmodule RecLLMGateway.Pricing do
   Returns the pricing table for all models.
   """
   def get_pricing do
-    Application.get_env(:rec_llm_gateway, :pricing, @default_pricing)
+    Application.get_env(:req_llm_gateway, :pricing, @default_pricing)
   end
 
   @doc """
@@ -93,7 +93,7 @@ defmodule RecLLMGateway.Pricing do
   def set_model_pricing(model, input_price, output_price) do
     current = get_pricing()
     updated = Map.put(current, model, %{input: input_price, output: output_price})
-    Application.put_env(:rec_llm_gateway, :pricing, updated)
+    Application.put_env(:req_llm_gateway, :pricing, updated)
     :ok
   end
 end

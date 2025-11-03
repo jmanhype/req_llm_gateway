@@ -1,6 +1,6 @@
-# Contributing to RecLLMGateway
+# Contributing to ReqLLMGateway
 
-Thank you for your interest in contributing to RecLLMGateway! This guide will help you get started.
+Thank you for your interest in contributing to ReqLLMGateway! This guide will help you get started.
 
 ## Code of Conduct
 
@@ -130,7 +130,7 @@ Format:
 All new features must include tests:
 
 ```elixir
-defmodule RecLLMGateway.NewFeatureTest do
+defmodule ReqLLMGateway.NewFeatureTest do
   use ExUnit.Case, async: true
   import Mox
 
@@ -142,7 +142,7 @@ defmodule RecLLMGateway.NewFeatureTest do
       input = %{...}
 
       # Act
-      result = RecLLMGateway.new_feature(input)
+      result = ReqLLMGateway.new_feature(input)
 
       # Assert
       assert result == expected
@@ -257,7 +257,7 @@ end
 
 Include:
 - Elixir/OTP versions
-- RecLLMGateway version
+- ReqLLMGateway version
 - Steps to reproduce
 - Expected vs actual behavior
 - Error messages/stack traces
