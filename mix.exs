@@ -2,7 +2,7 @@ defmodule ReqLLMGateway.MixProject do
   use Mix.Project
 
   @version "0.1.0"
-  @source_url "https://github.com/jmanhype/recllmgateway"
+  @source_url "https://github.com/jmanhype/req_llm_gateway"
 
   def project do
     [
