@@ -1,8 +1,8 @@
-defmodule RecLLMGateway do
+defmodule ReqLLMGateway do
   @moduledoc """
-  RecLLMGateway - OpenAI-compatible LLM proxy for Elixir/Phoenix applications.
+  ReqLLMGateway - OpenAI-compatible LLM proxy for Elixir/Phoenix applications.
 
-  RecLLMGateway is a production-ready library that provides an OpenAI-compatible
+  ReqLLMGateway is a production-ready library that provides an OpenAI-compatible
   endpoint with built-in telemetry, usage tracking, and multi-provider routing.
 
   ## Features
@@ -20,13 +20,13 @@ defmodule RecLLMGateway do
 
       # lib/my_app_web/router.ex
       scope "/v1" do
-        forward "/chat/completions", RecLLMGateway.Plug
+        forward "/chat/completions", ReqLLMGateway.Plug
       end
 
   Configure API keys:
 
       # config/config.exs
-      config :rec_llm_gateway,
+      config :req_llm_gateway,
         api_keys: %{
           "openai" => System.get_env("OPENAI_API_KEY"),
           "anthropic" => System.get_env("ANTHROPIC_API_KEY")
@@ -47,7 +47,7 @@ defmodule RecLLMGateway do
 
   All configuration options:
 
-      config :rec_llm_gateway,
+      config :req_llm_gateway,
         # Required: Provider API keys
         api_keys: %{
           "openai" => "sk-...",
@@ -55,32 +55,32 @@ defmodule RecLLMGateway do
         },
         # Optional: Default provider when no prefix specified (default: "openai")
         default_provider: "openai",
-        # Optional: Include x_rec_llm extension in responses (default: true)
+        # Optional: Include x_req_llm extension in responses (default: true)
         include_extensions: true,
         # Optional: Gateway authentication key
         api_key: System.get_env("GATEWAY_API_KEY"),
         # Optional: Custom LLM client for testing
-        llm_client: RecLLMGateway.LLMClient
+        llm_client: ReqLLMGateway.LLMClient
 
   ## Architecture
 
-  RecLLMGateway is composed of several modules:
+  ReqLLMGateway is composed of several modules:
 
-  - `RecLLMGateway.Plug` - Main HTTP endpoint handler
-  - `RecLLMGateway.LLMClient` - Multi-provider LLM client
-  - `RecLLMGateway.ModelParser` - Provider:model format parser
-  - `RecLLMGateway.Pricing` - Cost calculation per provider/model
-  - `RecLLMGateway.Usage` - ETS-backed usage statistics
-  - `RecLLMGateway.Telemetry` - Telemetry event definitions
-  - `RecLLMGateway.LiveDashboard` - Phoenix LiveDashboard integration
+  - `ReqLLMGateway.Plug` - Main HTTP endpoint handler
+  - `ReqLLMGateway.LLMClient` - Multi-provider LLM client
+  - `ReqLLMGateway.ModelParser` - Provider:model format parser
+  - `ReqLLMGateway.Pricing` - Cost calculation per provider/model
+  - `ReqLLMGateway.Usage` - ETS-backed usage statistics
+  - `ReqLLMGateway.Telemetry` - Telemetry event definitions
+  - `ReqLLMGateway.LiveDashboard` - Phoenix LiveDashboard integration
 
   ## Telemetry
 
-  RecLLMGateway emits the following telemetry events:
+  ReqLLMGateway emits the following telemetry events:
 
-  - `[:rec_llm_gateway, :request, :start]` - Request initiated
-  - `[:rec_llm_gateway, :request, :stop]` - Request completed (includes duration, tokens, cost)
-  - `[:rec_llm_gateway, :request, :exception]` - Request failed
+  - `[:req_llm_gateway, :request, :start]` - Request initiated
+  - `[:req_llm_gateway, :request, :stop]` - Request completed (includes duration, tokens, cost)
+  - `[:req_llm_gateway, :request, :exception]` - Request failed
 
   ## Response Format
 
@@ -97,7 +97,7 @@ defmodule RecLLMGateway do
           "completion_tokens": 20,
           "total_tokens": 30
         },
-        "x_rec_llm": {
+        "x_req_llm": {
           "provider": "openai",
           "latency_ms": 342,
           "cost_usd": 0.000063
@@ -109,7 +109,7 @@ defmodule RecLLMGateway do
   Mock the LLM client in tests:
 
       # config/test.exs
-      config :rec_llm_gateway,
+      config :req_llm_gateway,
         llm_client: MyApp.LLMClientMock
 
   See the test directory for examples using Mox.
@@ -120,16 +120,16 @@ defmodule RecLLMGateway do
   """
 
   @doc """
-  Returns the current version of RecLLMGateway.
+  Returns the current version of ReqLLMGateway.
 
   ## Examples
 
-      iex> RecLLMGateway.version()
+      iex> ReqLLMGateway.version()
       "0.1.0"
   """
   @spec version() :: String.t()
   def version do
-    Application.spec(:rec_llm_gateway, :vsn) |> to_string()
+    Application.spec(:req_llm_gateway, :vsn) |> to_string()
   end
 
   @doc """
@@ -137,12 +137,12 @@ defmodule RecLLMGateway do
 
   ## Examples
 
-      iex> RecLLMGateway.default_provider()
+      iex> ReqLLMGateway.default_provider()
       "openai"
   """
   @spec default_provider() :: String.t()
   def default_provider do
-    Application.get_env(:rec_llm_gateway, :default_provider, "openai")
+    Application.get_env(:req_llm_gateway, :default_provider, "openai")
   end
 
   @doc """
@@ -153,15 +153,15 @@ defmodule RecLLMGateway do
 
   ## Examples
 
-      iex> RecLLMGateway.configured?()
+      iex> ReqLLMGateway.configured?()
       {:ok, ["openai", "anthropic"]}
 
-      iex> RecLLMGateway.configured?()
+      iex> ReqLLMGateway.configured?()
       {:error, :no_api_keys}
   """
   @spec configured?() :: {:ok, [String.t()]} | {:error, :no_api_keys}
   def configured? do
-    case Application.get_env(:rec_llm_gateway, :api_keys, %{}) do
+    case Application.get_env(:req_llm_gateway, :api_keys, %{}) do
       api_keys when map_size(api_keys) > 0 ->
         providers = api_keys |> Map.keys() |> Enum.filter(&(not is_nil(Map.get(api_keys, &1))))
         if length(providers) > 0 do

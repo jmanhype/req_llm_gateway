@@ -1,6 +1,6 @@
 # Multi-Provider Routing
 
-RecLLMGateway supports routing requests to different LLM providers using a simple `provider:model` syntax.
+ReqLLMGateway supports routing requests to different LLM providers using a simple `provider:model` syntax.
 
 ## Model Format
 
@@ -44,7 +44,7 @@ If you don't specify a provider, the `default_provider` config is used:
 
 ```elixir
 # config/config.exs
-config :rec_llm_gateway,
+config :req_llm_gateway,
   default_provider: "openai"
 ```
 
@@ -78,21 +78,21 @@ The gateway automatically calculates costs per provider:
 
 ```json
 {
-  "x_rec_llm": {
+  "x_req_llm": {
     "provider": "openai",
     "cost_usd": 0.000063
   }
 }
 ```
 
-Pricing is configured in `RecLLMGateway.Pricing`.
+Pricing is configured in `ReqLLMGateway.Pricing`.
 
 ## Usage Statistics
 
 Usage stats are tracked per provider and model:
 
 ```elixir
-RecLLMGateway.Usage.get_all()
+ReqLLMGateway.Usage.get_all()
 #=> [
 #  %{
 #    provider: "openai",
@@ -135,15 +135,15 @@ To add a custom provider:
 1. Add API key to config:
 
 ```elixir
-config :rec_llm_gateway,
+config :req_llm_gateway,
   api_keys: %{
     "custom" => System.get_env("CUSTOM_API_KEY")
   }
 ```
 
-2. Extend `RecLLMGateway.LLMClient` to support your provider's API
+2. Extend `ReqLLMGateway.LLMClient` to support your provider's API
 
-3. Add pricing in `RecLLMGateway.Pricing`:
+3. Add pricing in `ReqLLMGateway.Pricing`:
 
 ```elixir
 defp pricing_for("custom", "my-model") do

@@ -1,6 +1,6 @@
 # Standalone Gateway Example
 
-Run RecLLMGateway as a standalone HTTP service without Phoenix.
+Run ReqLLMGateway as a standalone HTTP service without Phoenix.
 
 ## Setup
 
@@ -29,7 +29,7 @@ defmodule LLMGateway.MixProject do
 
   defp deps do
     [
-      {:rec_llm_gateway, "~> 0.1.0"},
+      {:req_llm_gateway, "~> 0.1.0"},
       {:plug_cowboy, "~> 2.6"}
     ]
   end
@@ -69,7 +69,7 @@ defmodule LLMGateway.Router do
   plug :match
   plug :dispatch
 
-  forward "/v1/chat/completions", to: RecLLMGateway.Plug
+  forward "/v1/chat/completions", to: ReqLLMGateway.Plug
 
   match _ do
     send_resp(conn, 404, "Not found")
@@ -84,7 +84,7 @@ Create `config/config.exs`:
 ```elixir
 import Config
 
-config :rec_llm_gateway,
+config :req_llm_gateway,
   api_keys: %{
     "openai" => System.get_env("OPENAI_API_KEY"),
     "anthropic" => System.get_env("ANTHROPIC_API_KEY")

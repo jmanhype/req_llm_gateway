@@ -1,4 +1,4 @@
-defmodule RecLLMGateway.Usage do
+defmodule ReqLLMGateway.Usage do
   @moduledoc """
   In-memory usage tracking with ETS.
 
@@ -13,9 +13,9 @@ defmodule RecLLMGateway.Usage do
 
   ## Examples
 
-      RecLLMGateway.Usage.record("openai", "gpt-4", %{"prompt_tokens" => 10, "completion_tokens" => 20, "cost_usd" => 0.001}, 250)
+      ReqLLMGateway.Usage.record("openai", "gpt-4", %{"prompt_tokens" => 10, "completion_tokens" => 20, "cost_usd" => 0.001}, 250)
 
-      RecLLMGateway.Usage.get_all()
+      ReqLLMGateway.Usage.get_all()
       #=> [
       #  %{
       #    date: ~D[2024-01-15],
@@ -34,7 +34,7 @@ defmodule RecLLMGateway.Usage do
   use GenServer
   require Logger
 
-  @table_name :rec_llm_gateway_usage
+  @table_name :req_llm_gateway_usage
 
   # Client API
 
@@ -141,7 +141,7 @@ defmodule RecLLMGateway.Usage do
         write_concurrency: true
       ])
 
-    Logger.info("Started RecLLMGateway.Usage ETS table: #{inspect(table)}")
+    Logger.info("Started ReqLLMGateway.Usage ETS table: #{inspect(table)}")
     {:ok, %{}}
   end
 

@@ -22,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **BREAKING**: Replaced HTTPoison with ReqLLM for multi-provider support
-- **BREAKING**: Configuration format changed from `config :rec_llm_gateway, :api_keys` to ReqLLM's format
+- **BREAKING**: Configuration format changed from `config :req_llm_gateway, :api_keys` to ReqLLM's format
 - LLMClient module refactored to use ReqLLM's `generate_text/3` function
 - Documentation updated to reflect ReqLLM integration
 
@@ -30,7 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Old configuration (no longer works):**
 ```elixir
-config :rec_llm_gateway,
+config :req_llm_gateway,
   api_keys: %{
     "openai" => System.get_env("OPENAI_API_KEY"),
     "anthropic" => System.get_env("ANTHROPIC_API_KEY")

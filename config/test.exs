@@ -1,9 +1,9 @@
 import Config
 
-config :rec_llm_gateway,
+config :req_llm_gateway,
   port: 4001,
   # Use mock client in tests
-  llm_client: RecLLMGateway.LLMClientMock,
+  llm_client: ReqLLMGateway.LLMClientMock,
   api_keys: %{
     "openai" => "test-key",
     "anthropic" => "test-key"

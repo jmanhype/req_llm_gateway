@@ -1,4 +1,4 @@
-defmodule RecLLMGateway.LiveDashboard do
+defmodule ReqLLMGateway.LiveDashboard do
   @moduledoc """
   LiveDashboard page for viewing usage statistics.
 
@@ -8,7 +8,7 @@ defmodule RecLLMGateway.LiveDashboard do
 
       live_dashboard "/dashboard",
         additional_pages: [
-          rec_llm: RecLLMGateway.LiveDashboard
+          req_llm: ReqLLMGateway.LiveDashboard
         ]
   """
 
@@ -92,7 +92,7 @@ defmodule RecLLMGateway.LiveDashboard do
   defp fetch_usage(params, _node) do
     %{sort_by: sort_by, sort_dir: sort_dir, limit: limit} = params
 
-    records = RecLLMGateway.Usage.get_all()
+    records = ReqLLMGateway.Usage.get_all()
 
     # Sort
     sorted =

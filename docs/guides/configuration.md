@@ -1,6 +1,6 @@
 # Configuration Guide
 
-RecLLMGateway uses ReqLLM under the hood, giving you access to 45+ LLM providers with 665+ models out of the box.
+ReqLLMGateway uses ReqLLM under the hood, giving you access to 45+ LLM providers with 665+ models out of the box.
 
 ## Quick Start
 
@@ -32,15 +32,15 @@ config :req_llm,
   groq_api_key: System.get_env("GROQ_API_KEY")
 ```
 
-## RecLLMGateway Configuration
+## ReqLLMGateway Configuration
 
 ```elixir
 # config/config.exs
-config :rec_llm_gateway,
+config :req_llm_gateway,
   # Default provider when no prefix is specified (default: "openai")
   default_provider: "openai",
 
-  # Include x_rec_llm extension in responses (default: true)
+  # Include x_req_llm extension in responses (default: true)
   include_extensions: true,
 
   # Optional gateway authentication
@@ -49,7 +49,7 @@ config :rec_llm_gateway,
 
 ## Supported Providers
 
-RecLLMGateway supports **45+ providers** via ReqLLM:
+ReqLLMGateway supports **45+ providers** via ReqLLM:
 
 ### Major Providers
 
@@ -127,7 +127,7 @@ curl http://localhost:4000/v1/chat/completions \
 Set a default provider for models without a prefix:
 
 ```elixir
-config :rec_llm_gateway,
+config :req_llm_gateway,
   default_provider: "openai"
 ```
 
@@ -138,7 +138,7 @@ Now `"model": "gpt-4"` automatically becomes `"model": "openai:gpt-4"`.
 Optionally require authentication for gateway access:
 
 ```elixir
-config :rec_llm_gateway,
+config :req_llm_gateway,
   api_key: "your-secret-gateway-key"
 ```
 
@@ -153,12 +153,12 @@ curl http://localhost:4000/v1/chat/completions \
 
 ## Response Extensions
 
-The `x_rec_llm` extension adds observability data:
+The `x_req_llm` extension adds observability data:
 
 ```json
 {
   "choices": [...],
-  "x_rec_llm": {
+  "x_req_llm": {
     "provider": "openai",
     "latency_ms": 342,
     "cost_usd": 0.000063
@@ -169,7 +169,7 @@ The `x_rec_llm` extension adds observability data:
 Disable for pure OpenAI compatibility:
 
 ```elixir
-config :rec_llm_gateway,
+config :req_llm_gateway,
   include_extensions: false
 ```
 
@@ -185,7 +185,7 @@ config :req_llm,
   openai_api_key: System.get_env("OPENAI_API_KEY"),
   anthropic_api_key: System.get_env("ANTHROPIC_API_KEY")
 
-config :rec_llm_gateway,
+config :req_llm_gateway,
   default_provider: "openai",
   include_extensions: true
 ```
@@ -202,7 +202,7 @@ if config_env() == :prod do
     anthropic_api_key: System.get_env("ANTHROPIC_API_KEY") || raise("ANTHROPIC_API_KEY not set"),
     google_api_key: System.get_env("GOOGLE_API_KEY")
 
-  config :rec_llm_gateway,
+  config :req_llm_gateway,
     api_key: System.get_env("GATEWAY_API_KEY"),
     default_provider: "openai",
     include_extensions: true
@@ -217,13 +217,13 @@ Mock the LLM client to avoid real API calls:
 # config/test.exs
 import Config
 
-config :rec_llm_gateway,
+config :req_llm_gateway,
   llm_client: MyApp.LLMClientMock
 ```
 
 ## ReqLLM Features
 
-RecLLMGateway inherits these features from ReqLLM:
+ReqLLMGateway inherits these features from ReqLLM:
 
 ### Automatic Cost Calculation
 
@@ -231,8 +231,8 @@ ReqLLM knows pricing for 665+ models:
 
 ```elixir
 # Costs are automatically calculated and included in responses
-{:ok, response} = RecLLMGateway.LLMClient.chat_completion("openai", "gpt-4", request)
-# response["x_rec_llm"]["cost_usd"] => 0.000063
+{:ok, response} = ReqLLMGateway.LLMClient.chat_completion("openai", "gpt-4", request)
+# response["x_req_llm"]["cost_usd"] => 0.000063
 ```
 
 ### Token Counting
@@ -265,7 +265,7 @@ Access model metadata:
 ReqLLM supports streaming for compatible providers:
 
 ```elixir
-# (Coming soon in RecLLMGateway)
+# (Coming soon in ReqLLMGateway)
 {"model": "openai:gpt-4", "stream": true}
 ```
 
@@ -309,7 +309,7 @@ If you're upgrading from a version that used custom `api_keys`:
 
 **Before:**
 ```elixir
-config :rec_llm_gateway,
+config :req_llm_gateway,
   api_keys: %{
     "openai" => System.get_env("OPENAI_API_KEY"),
     "anthropic" => System.get_env("ANTHROPIC_API_KEY")

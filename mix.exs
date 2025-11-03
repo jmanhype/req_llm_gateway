@@ -1,4 +1,4 @@
-defmodule RecLLMGateway.MixProject do
+defmodule ReqLLMGateway.MixProject do
   use Mix.Project
 
   @version "0.1.0"
@@ -6,7 +6,7 @@ defmodule RecLLMGateway.MixProject do
 
   def project do
     [
-      app: :rec_llm_gateway,
+      app: :req_llm_gateway,
       version: @version,
       elixir: "~> 1.14",
       start_permanent: Mix.env() == :prod,
@@ -15,7 +15,7 @@ defmodule RecLLMGateway.MixProject do
       aliases: aliases(),
 
       # Docs
-      name: "RecLLMGateway",
+      name: "ReqLLMGateway",
       description: "OpenAI-compatible LLM proxy with telemetry and multi-provider routing",
       source_url: @source_url,
       homepage_url: @source_url,
@@ -44,7 +44,7 @@ defmodule RecLLMGateway.MixProject do
   def application do
     [
       extra_applications: [:logger],
-      mod: {RecLLMGateway.Application, []}
+      mod: {ReqLLMGateway.Application, []}
     ]
   end
 
@@ -85,7 +85,7 @@ defmodule RecLLMGateway.MixProject do
 
   defp docs do
     [
-      main: "RecLLMGateway",
+      main: "ReqLLMGateway",
       source_ref: "v#{@version}",
       source_url: @source_url,
       extras: [
@@ -96,21 +96,21 @@ defmodule RecLLMGateway.MixProject do
       ],
       groups_for_modules: [
         "Core Components": [
-          RecLLMGateway,
-          RecLLMGateway.Plug,
-          RecLLMGateway.LLMClient
+          ReqLLMGateway,
+          ReqLLMGateway.Plug,
+          ReqLLMGateway.LLMClient
         ],
         "Utilities": [
-          RecLLMGateway.ModelParser,
-          RecLLMGateway.Pricing
+          ReqLLMGateway.ModelParser,
+          ReqLLMGateway.Pricing
         ],
         "Observability": [
-          RecLLMGateway.Telemetry,
-          RecLLMGateway.Usage,
-          RecLLMGateway.LiveDashboard
+          ReqLLMGateway.Telemetry,
+          ReqLLMGateway.Usage,
+          ReqLLMGateway.LiveDashboard
         ],
         "Application": [
-          RecLLMGateway.Application
+          ReqLLMGateway.Application
         ]
       ]
     ]
@@ -118,7 +118,7 @@ defmodule RecLLMGateway.MixProject do
 
   defp package do
     [
-      name: "rec_llm_gateway",
+      name: "req_llm_gateway",
       licenses: ["MIT"],
       links: %{
         "GitHub" => @source_url,

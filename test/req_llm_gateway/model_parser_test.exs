@@ -1,7 +1,7 @@
-defmodule RecLLMGateway.ModelParserTest do
+defmodule ReqLLMGateway.ModelParserTest do
   use ExUnit.Case, async: true
 
-  alias RecLLMGateway.ModelParser
+  alias ReqLLMGateway.ModelParser
 
   describe "parse/1" do
     test "parses provider:model format" do

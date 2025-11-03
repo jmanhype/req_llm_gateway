@@ -1,10 +1,10 @@
-defmodule RecLLMGateway.ConnCase do
+defmodule ReqLLMGateway.ConnCase do
   @moduledoc """
   Test helpers for Plug connections.
 
   Use this in your tests like:
 
-      use RecLLMGateway.ConnCase
+      use ReqLLMGateway.ConnCase
 
   """
 
@@ -13,7 +13,7 @@ defmodule RecLLMGateway.ConnCase do
   using do
     quote do
       import Plug.Conn
-      import RecLLMGateway.ConnCase
+      import ReqLLMGateway.ConnCase
 
       alias Plug.Conn
     end

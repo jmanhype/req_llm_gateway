@@ -1,2 +1,2 @@
-Mox.defmock(RecLLMGateway.LLMClientMock, for: RecLLMGateway.LLMClient)
+Mox.defmock(ReqLLMGateway.LLMClientMock, for: ReqLLMGateway.LLMClient)
 ExUnit.start()

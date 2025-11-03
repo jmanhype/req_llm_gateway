@@ -1,7 +1,7 @@
-defmodule RecLLMGateway.UsageTest do
+defmodule ReqLLMGateway.UsageTest do
   use ExUnit.Case
 
-  alias RecLLMGateway.Usage
+  alias ReqLLMGateway.Usage
 
   setup do
     # Start the Usage GenServer for tests
