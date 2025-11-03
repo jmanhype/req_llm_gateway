@@ -135,8 +135,8 @@ defmodule ReqLLMGateway.Plug do
   # --- LLM calling ---
 
   defp call_llm(provider, model, request) do
-    # This will call the RecLLM adapter - for now, we'll stub it
-    # In production, this would be: RecLLM.chat_completion(provider, model, request)
+    # Call the configured LLM client (uses ReqLLM by default)
+    # Can be mocked in tests via :llm_client config
     adapter = Application.get_env(:req_llm_gateway, :llm_client, ReqLLMGateway.LLMClient)
     adapter.chat_completion(provider, model, request)
   end

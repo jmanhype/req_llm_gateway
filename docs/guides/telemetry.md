@@ -84,7 +84,7 @@ defmodule MyApp.Telemetry do
 
   def setup do
     :telemetry.attach_many(
-      "my-app-rec-llm-handler",
+      "my-app-req-llm-handler",
       [
         [:req_llm_gateway, :request, :start],
         [:req_llm_gateway, :request, :stop],

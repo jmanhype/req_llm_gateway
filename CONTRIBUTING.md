@@ -53,7 +53,7 @@ mix test
 mix test
 
 # Run specific test file
-mix test test/rec_llm_gateway/plug_test.exs
+mix test test/req_llm_gateway/plug_test.exs
 
 # Run with coverage
 mix coveralls
@@ -89,7 +89,7 @@ Since this is a library, you'll need to test it in a Phoenix app or standalone:
 ```bash
 # In a Phoenix app
 cd path/to/phoenix/app
-# Add {:rec_llm_gateway, path: "../recllmgateway"} to mix.exs
+# Add {:req_llm_gateway, path: "../recllmgateway"} to mix.exs
 mix deps.get
 mix phx.server
 ```

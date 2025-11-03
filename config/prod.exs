@@ -1,6 +1,6 @@
 import Config
 
-config :rec_llm_gateway,
+config :req_llm_gateway,
   port: String.to_integer(System.get_env("PORT") || "4000")
 
 config :logger, level: :info
