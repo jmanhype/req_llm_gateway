@@ -76,14 +76,14 @@ config :req_llm,
 - Support for custom LLM clients (testing)
 
 ### Core Modules
-- `RecLLMGateway.Plug` - Main HTTP endpoint handler
-- `RecLLMGateway.LLMClient` - Multi-provider client
-- `RecLLMGateway.ModelParser` - Provider:model parser
-- `RecLLMGateway.Pricing` - Cost calculation
-- `RecLLMGateway.Usage` - Usage statistics tracking
-- `RecLLMGateway.Telemetry` - Telemetry event definitions
-- `RecLLMGateway.LiveDashboard` - LiveDashboard page
-- `RecLLMGateway.Application` - OTP application
+- `ReqLLMGateway.Plug` - Main HTTP endpoint handler
+- `ReqLLMGateway.LLMClient` - Multi-provider client
+- `ReqLLMGateway.ModelParser` - Provider:model parser
+- `ReqLLMGateway.Pricing` - Cost calculation
+- `ReqLLMGateway.Usage` - Usage statistics tracking
+- `ReqLLMGateway.Telemetry` - Telemetry event definitions
+- `ReqLLMGateway.LiveDashboard` - LiveDashboard page
+- `ReqLLMGateway.Application` - OTP application
 
 ### Documentation
 - Quick start guide
