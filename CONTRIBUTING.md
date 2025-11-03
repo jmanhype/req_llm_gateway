@@ -21,8 +21,8 @@ Thank you for your interest in contributing to ReqLLMGateway! This guide will he
 1. Fork and clone the repository:
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/recllmgateway.git
-cd recllmgateway
+git clone https://github.com/YOUR_USERNAME/req_llm_gateway.git
+cd req_llm_gateway
 ```
 
 2. Install dependencies:
@@ -53,7 +53,7 @@ mix test
 mix test
 
 # Run specific test file
-mix test test/rec_llm_gateway/plug_test.exs
+mix test test/req_llm_gateway/plug_test.exs
 
 # Run with coverage
 mix coveralls
@@ -89,7 +89,7 @@ Since this is a library, you'll need to test it in a Phoenix app or standalone:
 ```bash
 # In a Phoenix app
 cd path/to/phoenix/app
-# Add {:rec_llm_gateway, path: "../recllmgateway"} to mix.exs
+# Add {:req_llm_gateway, path: "../req_llm_gateway"} to mix.exs
 mix deps.get
 mix phx.server
 ```
@@ -272,7 +272,7 @@ Include:
 
 ## Questions?
 
-- Open a [Discussion](https://github.com/jmanhype/recllmgateway/discussions)
+- Open a [Discussion](https://github.com/jmanhype/req_llm_gateway/discussions)
 - Ask in issues with `question` label
 
 ## License
