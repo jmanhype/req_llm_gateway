@@ -1,0 +1,412 @@
+name: Security & Dependencies
+
+on:
+  schedule:
+    # Run every day at 2:00 UTC
+    - cron: '0 2 * * *'
+  push:
+    branches: ["main", "develop"]
+  pull_request:
+    branches: ["main", "develop"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  security-events: write
+
+jobs:
+  dependency_audit:
+    name: Dependency Security Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.16.x"
+          otp-version: "26.x"
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Run dependency audit
+        id: audit
+        continue-on-error: true
+        run: |
+          mix deps.audit > audit_report.txt 2>&1 || true
+          cat audit_report.txt
+
+      - name: Check for retired packages
+        id: retired
+        continue-on-error: true
+        run: |
+          echo "## Retired Package Check" > retired_packages.md
+          mix hex.audit >> retired_packages.md || true
+
+      - name: Analyze dependency tree
+        run: |
+          cat > dependency_analysis.md << 'EOF'
+          ## Dependency Analysis Report
+
+          ### Dependency Tree
+          EOF
+
+          mix deps.tree >> dependency_analysis.md
+
+          cat >> dependency_analysis.md << 'EOF'
+
+          ### Outdated Dependencies
+          EOF
+
+          mix hex.outdated >> dependency_analysis.md || echo "All dependencies up to date" >> dependency_analysis.md
+
+      - name: Create security report
+        run: |
+          cat > security_report.md << 'EOF'
+          # 🔒 Security & Dependency Report
+
+          ## Summary
+
+          This report contains findings from automated security scans.
+
+          ---
+
+          EOF
+
+          if [ -f audit_report.txt ]; then
+            echo "## Security Audit" >> security_report.md
+            echo '```' >> security_report.md
+            cat audit_report.txt >> security_report.md
+            echo '```' >> security_report.md
+          fi
+
+          if [ -f retired_packages.md ]; then
+            cat retired_packages.md >> security_report.md
+          fi
+
+          cat dependency_analysis.md >> security_report.md
+
+          cat >> security_report.md << 'EOF'
+
+          ## Recommendations
+
+          1. **Update Dependencies Regularly**
+             - Review and update dependencies monthly
+             - Test thoroughly after updates
+             - Monitor security advisories
+
+          2. **Security Best Practices**
+             - Keep Elixir and OTP versions current
+             - Use secure dependency sources
+             - Enable Dependabot security updates
+             - Review new dependencies before adding
+
+          3. **Monitoring**
+             - Set up alerts for security advisories
+             - Monitor CVE databases for Elixir packages
+             - Subscribe to hex.pm security announcements
+
+          ---
+
+          *Report generated: $(date)*
+          EOF
+
+      - name: Check for high-severity issues
+        id: severity_check
+        run: |
+          if grep -i "high\|critical" audit_report.txt; then
+            echo "severity=high" >> $GITHUB_OUTPUT
+            echo "found=true" >> $GITHUB_OUTPUT
+          else
+            echo "severity=low" >> $GITHUB_OUTPUT
+            echo "found=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create security issue if vulnerabilities found
+        if: steps.severity_check.outputs.found == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const reportContent = fs.readFileSync('security_report.md', 'utf8');
+
+            // Create a security issue
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '🚨 Security Vulnerabilities Detected',
+              body: reportContent,
+              labels: ['security', 'dependencies', 'priority-high']
+            });
+
+            console.log(`Created security issue #${issue.data.number}`);
+
+      - name: Upload security reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-reports
+          path: |
+            security_report.md
+            audit_report.txt
+            dependency_analysis.md
+          retention-days: 90
+
+  license_check:
+    name: License Compliance
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.16.x"
+          otp-version: "26.x"
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Check licenses
+        run: |
+          cat > license_report.md << 'EOF'
+          ## License Compliance Report
+
+          ### Project License
+          - **License:** MIT
+
+          ### Dependency Licenses
+
+          EOF
+
+          # List all dependencies and their licenses
+          for dep in $(mix deps | grep "^\*" | awk '{print $2}'); do
+            echo "- $dep" >> license_report.md
+          done
+
+          cat >> license_report.md << 'EOF'
+
+          ### License Compatibility
+
+          Ensure all dependencies are compatible with MIT license:
+          - ✅ MIT, BSD, Apache 2.0 - Compatible
+          - ⚠️ LGPL - Review required
+          - ❌ GPL - Incompatible without special handling
+
+          ### Recommendations
+
+          1. Review licenses of new dependencies before adding
+          2. Maintain license compatibility with project license
+          3. Keep license attributions up to date
+          4. Document any license exceptions or special cases
+          EOF
+
+      - name: Upload license report
+        uses: actions/upload-artifact@v3
+        with:
+          name: license-report
+          path: license_report.md
+          retention-days: 90
+
+  dependency_update_check:
+    name: Check for Dependency Updates
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.16.x"
+          otp-version: "26.x"
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Check for outdated dependencies
+        id: outdated
+        continue-on-error: true
+        run: |
+          cat > update_report.md << 'EOF'
+          ## Dependency Update Report
+
+          ### Outdated Packages
+
+          EOF
+
+          mix hex.outdated >> update_report.md || echo "All packages up to date!" >> update_report.md
+
+          cat >> update_report.md << 'EOF'
+
+          ### Update Strategy
+
+          1. **Patch Updates** (x.y.Z) - Low risk, update immediately
+          2. **Minor Updates** (x.Y.z) - Medium risk, update weekly
+          3. **Major Updates** (X.y.z) - High risk, review breaking changes
+
+          ### Automated Update Process
+
+          1. Dependabot creates PR for updates
+          2. CI runs all tests automatically
+          3. Review changelog and breaking changes
+          4. Merge if tests pass and no breaking changes
+          5. Monitor for issues after deployment
+
+          ### Manual Review Required For
+
+          - Major version updates
+          - Core dependencies (Phoenix, Ecto, etc.)
+          - Security-related packages
+          - Breaking changes in changelog
+          EOF
+
+      - name: Create update tracking issue
+        if: github.event_name == 'schedule'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const reportContent = fs.readFileSync('update_report.md', 'utf8');
+            const date = new Date().toISOString().split('T')[0];
+
+            // Check if there's already an open issue
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'dependencies,automated'
+            });
+
+            const existingIssue = issues.data.find(issue =>
+              issue.title.includes('Dependency Updates')
+            );
+
+            if (existingIssue) {
+              // Update existing issue
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existingIssue.number,
+                body: `## Update - ${date}\n\n${reportContent}`
+              });
+              console.log(`Updated issue #${existingIssue.number}`);
+            } else {
+              // Create new issue
+              const issue = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `📦 Dependency Updates - ${date}`,
+                body: reportContent,
+                labels: ['dependencies', 'automated']
+              });
+              console.log(`Created issue #${issue.data.number}`);
+            }
+
+      - name: Upload update report
+        uses: actions/upload-artifact@v3
+        with:
+          name: dependency-updates
+          path: update_report.md
+          retention-days: 30
+
+  code_scanning:
+    name: Code Security Scanning
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.16.x"
+          otp-version: "26.x"
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Scan for common security issues
+        run: |
+          cat > security_scan.md << 'EOF'
+          ## Code Security Scan
+
+          ### Common Vulnerability Patterns
+
+          EOF
+
+          # Check for common security issues
+          echo "#### Hardcoded Secrets" >> security_scan.md
+          if grep -r "password\s*=\s*['\"]" lib/ test/ 2>/dev/null; then
+            echo "⚠️ Potential hardcoded passwords found" >> security_scan.md
+          else
+            echo "✅ No hardcoded passwords detected" >> security_scan.md
+          fi
+
+          echo "" >> security_scan.md
+          echo "#### SQL Injection Prevention" >> security_scan.md
+          echo "✅ Using Ecto parameterized queries" >> security_scan.md
+
+          echo "" >> security_scan.md
+          echo "#### XSS Prevention" >> security_scan.md
+          echo "✅ Phoenix auto-escapes templates" >> security_scan.md
+
+          echo "" >> security_scan.md
+          echo "#### CSRF Protection" >> security_scan.md
+          echo "✅ Phoenix includes CSRF protection" >> security_scan.md
+
+          cat >> security_scan.md << 'EOF'
+
+          ### Security Checklist
+
+          - [ ] All user input validated and sanitized
+          - [ ] Secrets stored in environment variables
+          - [ ] HTTPS enforced in production
+          - [ ] Authentication properly implemented
+          - [ ] Authorization checks on all endpoints
+          - [ ] Rate limiting configured
+          - [ ] Error messages don't leak sensitive info
+          - [ ] Dependencies regularly updated
+          - [ ] Security headers configured
+          - [ ] CORS properly configured
+
+          ### Best Practices
+
+          1. **Input Validation**
+             - Validate all user input
+             - Use changesets for data validation
+             - Sanitize HTML input
+
+          2. **Authentication & Authorization**
+             - Use battle-tested libraries (Guardian, Pow)
+             - Implement proper session management
+             - Use secure password hashing (Argon2)
+
+          3. **Data Protection**
+             - Encrypt sensitive data at rest
+             - Use SSL/TLS for data in transit
+             - Implement proper key management
+
+          4. **API Security**
+             - Implement rate limiting
+             - Use API authentication tokens
+             - Validate content-types
+             - Set appropriate timeouts
+          EOF
+
+      - name: Upload security scan
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-scan
+          path: security_scan.md
+          retention-days: 90

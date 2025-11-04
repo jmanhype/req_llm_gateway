@@ -1,0 +1,231 @@
+name: AI Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  ai_review:
+    name: AI-Powered Code Review
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get changed files
+        id: changed_files
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} > changed_files.txt
+          else
+            git diff --name-only HEAD~1 HEAD > changed_files.txt
+          fi
+          echo "files=$(cat changed_files.txt | tr '\n' ' ')" >> $GITHUB_OUTPUT
+
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.16.x"
+          otp-version: "26.x"
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Analyze code complexity
+        id: complexity
+        run: |
+          # Run analysis on changed Elixir files
+          for file in $(cat changed_files.txt | grep "\.ex$\|\.exs$"); do
+            if [ -f "$file" ]; then
+              echo "Analyzing $file"
+              # Count lines, functions, and complexity indicators
+              lines=$(wc -l < "$file")
+              functions=$(grep -c "def " "$file" || echo 0)
+              echo "- $file: $lines lines, $functions functions" >> complexity_report.txt
+            fi
+          done
+
+      - name: Run Credo on changed files
+        id: credo_analysis
+        continue-on-error: true
+        run: |
+          mix credo --strict --format json > credo_report.json || true
+
+      - name: Analyze test coverage for changed files
+        id: coverage_analysis
+        continue-on-error: true
+        run: |
+          mix test --cover > coverage_output.txt || true
+
+      - name: Generate AI review summary
+        id: ai_summary
+        run: |
+          cat > ai_review.md << 'EOF'
+          ## 🤖 AI Code Review Summary
+
+          ### 📊 Analysis Results
+
+          **Changed Files:**
+          EOF
+
+          if [ -f complexity_report.txt ]; then
+            cat complexity_report.txt >> ai_review.md
+          fi
+
+          cat >> ai_review.md << 'EOF'
+
+          ### ✅ Code Quality Checks
+
+          EOF
+
+          if [ -f credo_report.json ]; then
+            echo "- **Credo Analysis:** See detailed report below" >> ai_review.md
+          fi
+
+          cat >> ai_review.md << 'EOF'
+
+          ### 💡 Recommendations
+
+          - **Testing:** Ensure all new functions have corresponding tests
+          - **Documentation:** Add/update module and function documentation
+          - **Type Specs:** Add @spec annotations for public functions
+          - **Error Handling:** Consider edge cases and error conditions
+          - **Performance:** Review algorithmic complexity for large datasets
+
+          ### 📝 Code Review Checklist
+
+          - [ ] All tests passing
+          - [ ] Code follows style guidelines
+          - [ ] Documentation updated
+          - [ ] No security vulnerabilities introduced
+          - [ ] Performance considerations addressed
+          - [ ] Error handling implemented
+          - [ ] Backwards compatibility maintained
+
+          ### 🔍 Focus Areas
+
+          **High Priority:**
+          - Review error handling in modified functions
+          - Verify test coverage for new code paths
+          - Check for potential race conditions in concurrent code
+
+          **Medium Priority:**
+          - Optimize repeated calculations or database queries
+          - Improve code readability with better naming
+          - Consider extracting complex logic into helper functions
+
+          **Low Priority:**
+          - Add inline comments for complex algorithms
+          - Consider performance optimizations for hot paths
+
+          ---
+          *This is an automated analysis. Please review manually for context-specific issues.*
+          EOF
+
+      - name: Post AI review comment
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const reviewContent = fs.readFileSync('ai_review.md', 'utf8');
+
+            // Post review comment
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: reviewContent
+            });
+
+      - name: Upload analysis artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: ai-code-review
+          path: |
+            ai_review.md
+            complexity_report.txt
+            credo_report.json
+            coverage_output.txt
+          retention-days: 90
+
+  code_patterns:
+    name: Pattern Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Analyze code patterns
+        id: patterns
+        run: |
+          cat > pattern_analysis.md << 'EOF'
+          ## 🔍 Code Pattern Analysis
+
+          ### Common Patterns Detected
+
+          EOF
+
+          # Analyze for common Elixir patterns
+          echo "### GenServer Usage" >> pattern_analysis.md
+          genserver_count=$(find lib -name "*.ex" -exec grep -l "use GenServer" {} \; | wc -l)
+          echo "- GenServer modules: $genserver_count" >> pattern_analysis.md
+
+          echo "" >> pattern_analysis.md
+          echo "### Supervision Trees" >> pattern_analysis.md
+          supervisor_count=$(find lib -name "*.ex" -exec grep -l "Supervisor" {} \; | wc -l)
+          echo "- Supervisor modules: $supervisor_count" >> pattern_analysis.md
+
+          echo "" >> pattern_analysis.md
+          echo "### Testing Patterns" >> pattern_analysis.md
+          test_count=$(find test -name "*_test.exs" | wc -l)
+          echo "- Test files: $test_count" >> pattern_analysis.md
+
+          echo "" >> pattern_analysis.md
+          echo "### Documentation Coverage" >> pattern_analysis.md
+          documented=$(find lib -name "*.ex" -exec grep -l "@moduledoc" {} \; | wc -l)
+          total_modules=$(find lib -name "*.ex" | wc -l)
+          echo "- Documented modules: $documented / $total_modules" >> pattern_analysis.md
+
+          echo "" >> pattern_analysis.md
+          echo "### Recommendations" >> pattern_analysis.md
+          echo "- Consider using pattern matching more extensively" >> pattern_analysis.md
+          echo "- Leverage pipe operator for data transformations" >> pattern_analysis.md
+          echo "- Use with statements for complex pattern matching" >> pattern_analysis.md
+          echo "- Consider using protocols for polymorphic behavior" >> pattern_analysis.md
+
+      - name: Post pattern analysis
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const patternContent = fs.readFileSync('pattern_analysis.md', 'utf8');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: patternContent
+            });
+
+      - name: Upload pattern analysis
+        uses: actions/upload-artifact@v3
+        with:
+          name: pattern-analysis
+          path: pattern_analysis.md
+          retention-days: 90

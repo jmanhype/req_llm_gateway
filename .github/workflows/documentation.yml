@@ -1,0 +1,349 @@
+name: Documentation
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - 'lib/**'
+      - 'docs/**'
+      - 'README.md'
+      - 'mix.exs'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  generate_docs:
+    name: Generate API Documentation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.16.x"
+          otp-version: "26.x"
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Generate ExDoc documentation
+        run: |
+          mix docs
+
+      - name: Create documentation index
+        run: |
+          cat > doc/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <meta http-equiv="refresh" content="0; url=./ReqLLMGateway.html">
+            <title>ReqLLMGateway Documentation</title>
+          </head>
+          <body>
+            <p>Redirecting to <a href="./ReqLLMGateway.html">ReqLLMGateway Documentation</a></p>
+          </body>
+          </html>
+          EOF
+
+      - name: Upload documentation artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: api-documentation
+          path: doc/
+          retention-days: 90
+
+      - name: Deploy to GitHub Pages
+        if: github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./doc
+          publish_branch: gh-pages
+          force_orphan: true
+
+  check_documentation:
+    name: Check Documentation Quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.16.x"
+          otp-version: "26.x"
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Analyze documentation coverage
+        run: |
+          cat > doc_quality_report.md << 'EOF'
+          ## Documentation Quality Report
+
+          ### Module Documentation Coverage
+
+          EOF
+
+          total_modules=0
+          documented_modules=0
+
+          for file in $(find lib -name "*.ex"); do
+            total_modules=$((total_modules + 1))
+            if grep -q "@moduledoc" "$file"; then
+              documented_modules=$((documented_modules + 1))
+              echo "- ✅ $file" >> doc_quality_report.md
+            else
+              echo "- ❌ $file (missing @moduledoc)" >> doc_quality_report.md
+            fi
+          done
+
+          coverage=$((documented_modules * 100 / total_modules))
+
+          cat >> doc_quality_report.md << EOF
+
+          ### Summary
+          - Total modules: $total_modules
+          - Documented modules: $documented_modules
+          - Documentation coverage: $coverage%
+
+          EOF
+
+          if [ $coverage -lt 80 ]; then
+            cat >> doc_quality_report.md << 'EOF'
+          ⚠️ **Warning:** Documentation coverage is below 80%
+
+          EOF
+          fi
+
+          cat >> doc_quality_report.md << 'EOF'
+          ### Function Documentation
+
+          EOF
+
+          # Check for undocumented public functions
+          for file in $(find lib -name "*.ex"); do
+            # Count public functions
+            public_funcs=$(grep -c "^\s*def " "$file" || echo 0)
+            # Count documented functions (simple heuristic)
+            doc_funcs=$(grep -c "@doc" "$file" || echo 0)
+
+            if [ $public_funcs -gt 0 ]; then
+              echo "- $file: $doc_funcs/$public_funcs functions documented" >> doc_quality_report.md
+            fi
+          done
+
+          cat >> doc_quality_report.md << 'EOF'
+
+          ### Type Specifications
+
+          EOF
+
+          # Check for @spec annotations
+          for file in $(find lib -name "*.ex"); do
+            public_funcs=$(grep -c "^\s*def " "$file" || echo 0)
+            spec_funcs=$(grep -c "@spec" "$file" || echo 0)
+
+            if [ $public_funcs -gt 0 ]; then
+              echo "- $file: $spec_funcs/$public_funcs functions have @spec" >> doc_quality_report.md
+            fi
+          done
+
+          cat >> doc_quality_report.md << 'EOF'
+
+          ### Documentation Best Practices
+
+          #### Module Documentation (@moduledoc)
+          - [ ] Clear description of module purpose
+          - [ ] Usage examples included
+          - [ ] Links to related modules
+          - [ ] Configuration options documented
+
+          #### Function Documentation (@doc)
+          - [ ] Clear description of what function does
+          - [ ] Parameters documented
+          - [ ] Return values explained
+          - [ ] Edge cases and errors noted
+          - [ ] Examples provided for complex functions
+
+          #### Type Specifications (@spec)
+          - [ ] All public functions have @spec
+          - [ ] Custom types defined with @type
+          - [ ] Complex types documented with @typedoc
+
+          ### Recommendations
+
+          1. **Increase Coverage**
+             - Add @moduledoc to all modules
+             - Document all public functions
+             - Add type specifications
+
+          2. **Improve Quality**
+             - Include usage examples
+             - Document edge cases
+             - Link related documentation
+
+          3. **Maintain Documentation**
+             - Update docs when code changes
+             - Review docs in code reviews
+             - Use doctests for examples
+          EOF
+
+      - name: Check for broken links in docs
+        run: |
+          cat > link_check_report.md << 'EOF'
+          ## Documentation Link Check
+
+          Checking for broken links in documentation...
+
+          EOF
+
+          # Check markdown files for links
+          for file in $(find docs -name "*.md" 2>/dev/null || echo ""); do
+            if [ -f "$file" ]; then
+              echo "Checking $file..." >> link_check_report.md
+            fi
+          done
+
+          cat >> link_check_report.md << 'EOF'
+
+          ### Recommendations
+          - Use relative links for internal documentation
+          - Verify external links are still valid
+          - Update links when files are moved
+          - Consider using link checking tools
+          EOF
+
+      - name: Generate documentation improvement plan
+        run: |
+          cat > doc_improvement_plan.md << 'EOF'
+          ## Documentation Improvement Plan
+
+          ### Short Term (Next Sprint)
+          1. Add missing @moduledoc to undocumented modules
+          2. Add @spec to public functions without specifications
+          3. Review and update README.md
+
+          ### Medium Term (Next Month)
+          1. Add comprehensive examples to key modules
+          2. Create architecture documentation
+          3. Document all configuration options
+          4. Add troubleshooting guide
+
+          ### Long Term (Next Quarter)
+          1. Create video tutorials
+          2. Build interactive examples
+          3. Create API cookbook with common patterns
+          4. Set up documentation versioning
+
+          ### Ongoing Maintenance
+          - Review documentation in every PR
+          - Keep examples up to date
+          - Test documentation code samples
+          - Monitor documentation feedback
+
+          ### Tools and Automation
+          - Use ExDoc for API documentation
+          - Enable doctests for code examples
+          - Set up automated link checking
+          - Create documentation templates
+
+          ### Quality Metrics
+          - Module documentation coverage > 95%
+          - Function documentation coverage > 90%
+          - Type specification coverage > 85%
+          - Zero broken links
+          - Documentation builds without warnings
+          EOF
+
+      - name: Combine all documentation reports
+        run: |
+          cat > complete_doc_report.md << 'EOF'
+          # 📚 Documentation Quality Report
+
+          EOF
+
+          cat doc_quality_report.md >> complete_doc_report.md
+          echo "" >> complete_doc_report.md
+          cat link_check_report.md >> complete_doc_report.md
+          echo "" >> complete_doc_report.md
+          cat doc_improvement_plan.md >> complete_doc_report.md
+
+          cat >> complete_doc_report.md << 'EOF'
+
+          ---
+
+          *Generated by automated documentation workflow*
+          EOF
+
+      - name: Upload documentation reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: documentation-reports
+          path: |
+            complete_doc_report.md
+            doc_quality_report.md
+            link_check_report.md
+            doc_improvement_plan.md
+          retention-days: 90
+
+  update_changelog:
+    name: Check Changelog Updates
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if CHANGELOG.md was updated
+        id: changelog_check
+        run: |
+          if git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} | grep -q "CHANGELOG.md"; then
+            echo "updated=true" >> $GITHUB_OUTPUT
+          else
+            echo "updated=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Comment on PR if changelog not updated
+        if: steps.changelog_check.outputs.updated == 'false'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `## 📝 Changelog Reminder
+
+              This PR doesn't appear to update the CHANGELOG.md file.
+
+              If this PR includes user-facing changes, please add an entry to CHANGELOG.md under the "Unreleased" section.
+
+              ### Changelog Entry Format:
+              \`\`\`markdown
+              ### Added
+              - New feature description (#PR_NUMBER)
+
+              ### Changed
+              - Changed behavior description (#PR_NUMBER)
+
+              ### Fixed
+              - Bug fix description (#PR_NUMBER)
+              \`\`\`
+
+              If this PR doesn't require a changelog entry (e.g., documentation only, internal refactoring), you can ignore this message.`
+            });

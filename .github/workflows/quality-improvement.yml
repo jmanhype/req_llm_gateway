@@ -1,0 +1,367 @@
+name: Quality Improvement
+
+on:
+  schedule:
+    # Run every Monday at 9:00 UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  analyze_improvements:
+    name: Analyze Improvement Opportunities
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.16.x"
+          otp-version: "26.x"
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Run comprehensive quality analysis
+        run: |
+          mkdir -p quality_reports
+
+          # Credo analysis
+          echo "Running Credo analysis..."
+          mix credo --strict --format json > quality_reports/credo.json || true
+
+          # Test coverage
+          echo "Analyzing test coverage..."
+          mix coveralls.json || true
+          cp cover/excoveralls.json quality_reports/coverage.json || true
+
+          # Code statistics
+          echo "Gathering code statistics..."
+          find lib -name "*.ex" | xargs wc -l | tail -1 > quality_reports/code_stats.txt
+          find test -name "*.exs" | xargs wc -l | tail -1 >> quality_reports/code_stats.txt
+
+      - name: Identify untested modules
+        id: untested
+        run: |
+          cat > quality_reports/untested_modules.md << 'EOF'
+          ## Modules Needing Tests
+
+          EOF
+
+          # Find modules without corresponding tests
+          for file in $(find lib -name "*.ex"); do
+            module_name=$(basename "$file" .ex)
+            test_file="test/$(dirname "$file" | sed 's|lib/||')/${module_name}_test.exs"
+
+            if [ ! -f "$test_file" ]; then
+              echo "- [ ] $file (missing test file: $test_file)" >> quality_reports/untested_modules.md
+            fi
+          done
+
+      - name: Analyze documentation coverage
+        id: docs_coverage
+        run: |
+          cat > quality_reports/doc_improvements.md << 'EOF'
+          ## Documentation Improvements Needed
+
+          ### Missing Module Documentation
+          EOF
+
+          # Find modules without @moduledoc
+          for file in $(find lib -name "*.ex"); do
+            if ! grep -q "@moduledoc" "$file"; then
+              echo "- [ ] $file" >> quality_reports/doc_improvements.md
+            fi
+          done
+
+          echo "" >> quality_reports/doc_improvements.md
+          echo "### Missing Function Documentation" >> quality_reports/doc_improvements.md
+
+          # Find public functions without @doc
+          for file in $(find lib -name "*.ex"); do
+            # Simple heuristic: look for 'def ' without preceding @doc
+            if grep -B1 "^\s*def " "$file" | grep -v "@doc" | grep "def " > /dev/null; then
+              echo "- [ ] $file (has undocumented public functions)" >> quality_reports/doc_improvements.md
+            fi
+          done
+
+      - name: Identify performance improvements
+        id: performance
+        run: |
+          cat > quality_reports/performance_suggestions.md << 'EOF'
+          ## Performance Improvement Suggestions
+
+          ### Potential Optimizations
+
+          1. **Database Queries**
+             - [ ] Review N+1 query patterns
+             - [ ] Add indexes where appropriate
+             - [ ] Use Ecto.Multi for batch operations
+
+          2. **Caching Opportunities**
+             - [ ] Identify frequently accessed data
+             - [ ] Implement ETS caching where appropriate
+             - [ ] Use agent/GenServer state for hot data
+
+          3. **Concurrency**
+             - [ ] Review Task.async usage
+             - [ ] Consider Task.Supervisor for parallel operations
+             - [ ] Evaluate pooling for external resources
+
+          4. **Memory Usage**
+             - [ ] Review large data structure creation
+             - [ ] Use streams for large collections
+             - [ ] Profile memory usage in production-like scenarios
+
+          ### Code Patterns to Review
+
+          EOF
+
+          # Look for potentially inefficient patterns
+          echo "#### Enum.map followed by Enum.filter" >> quality_reports/performance_suggestions.md
+          grep -r "Enum.map" lib | wc -l > /tmp/enum_count
+          echo "- Found $(cat /tmp/enum_count) Enum.map calls - consider using for comprehensions" >> quality_reports/performance_suggestions.md
+
+      - name: Check for code smells
+        id: code_smells
+        run: |
+          cat > quality_reports/code_smells.md << 'EOF'
+          ## Code Smells Detected
+
+          ### Long Functions
+          EOF
+
+          # Find functions with many lines (simple heuristic)
+          for file in $(find lib -name "*.ex"); do
+            awk '/^\s*def / {start=NR} /^\s*end\s*$/ {if (NR-start > 30) print FILENAME ":" start " (long function: " NR-start " lines)"}' "$file" >> quality_reports/code_smells.md || true
+          done
+
+          cat >> quality_reports/code_smells.md << 'EOF'
+
+          ### TODO/FIXME Comments
+          EOF
+
+          grep -rn "TODO\|FIXME" lib test | head -20 >> quality_reports/code_smells.md || echo "None found" >> quality_reports/code_smells.md
+
+          cat >> quality_reports/code_smells.md << 'EOF'
+
+          ### Recommendations
+          - Break down long functions into smaller, focused functions
+          - Address TODO comments or create issues for them
+          - Extract complex conditionals into named functions
+          - Use pattern matching instead of nested if/case statements
+          EOF
+
+      - name: Generate improvement report
+        id: report
+        run: |
+          cat > improvement_report.md << 'EOF'
+          # 🚀 Weekly Quality Improvement Report
+
+          ## Executive Summary
+
+          This automated analysis has identified several opportunities to improve code quality.
+
+          ---
+
+          EOF
+
+          # Combine all reports
+          cat quality_reports/untested_modules.md >> improvement_report.md
+          echo "" >> improvement_report.md
+          cat quality_reports/doc_improvements.md >> improvement_report.md
+          echo "" >> improvement_report.md
+          cat quality_reports/performance_suggestions.md >> improvement_report.md
+          echo "" >> improvement_report.md
+          cat quality_reports/code_smells.md >> improvement_report.md
+
+          cat >> improvement_report.md << 'EOF'
+
+          ---
+
+          ## Next Steps
+
+          1. Review this report with the team
+          2. Prioritize improvements based on impact
+          3. Create issues for high-priority items
+          4. Schedule improvements in upcoming sprints
+
+          *This report was generated automatically by the Quality Improvement workflow.*
+          EOF
+
+      - name: Create improvement issue
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const reportContent = fs.readFileSync('improvement_report.md', 'utf8');
+            const date = new Date().toISOString().split('T')[0];
+
+            // Create an issue with the report
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Quality Improvement Report - ${date}`,
+              body: reportContent,
+              labels: ['quality', 'automated', 'improvement']
+            });
+
+            console.log(`Created issue #${issue.data.number}`);
+
+      - name: Upload improvement reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: quality-improvement-report
+          path: |
+            improvement_report.md
+            quality_reports/
+          retention-days: 90
+
+  test_coverage_improvement:
+    name: Suggest Test Coverage Improvements
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.16.x"
+          otp-version: "26.x"
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Generate coverage report
+        run: |
+          mix coveralls.html
+          mix coveralls.json
+
+      - name: Analyze coverage gaps
+        run: |
+          cat > coverage_improvements.md << 'EOF'
+          ## Test Coverage Improvement Plan
+
+          ### Coverage by Module
+
+          EOF
+
+          # Parse coverage JSON and identify low-coverage files
+          if [ -f cover/excoveralls.json ]; then
+            echo "Analyzing coverage data..." >> coverage_improvements.md
+          fi
+
+          cat >> coverage_improvements.md << 'EOF'
+
+          ### Priority Areas for Test Improvement
+
+          1. **Critical Paths**
+             - [ ] Authentication/authorization logic
+             - [ ] Payment processing
+             - [ ] Data validation and sanitization
+             - [ ] Error handling paths
+
+          2. **Edge Cases**
+             - [ ] Boundary conditions
+             - [ ] Error scenarios
+             - [ ] Race conditions
+             - [ ] Concurrent operations
+
+          3. **Integration Points**
+             - [ ] External API interactions
+             - [ ] Database operations
+             - [ ] File system operations
+             - [ ] Network operations
+
+          ### Testing Best Practices Checklist
+
+          - [ ] Unit tests for all public functions
+          - [ ] Integration tests for critical flows
+          - [ ] Property-based tests for complex logic
+          - [ ] Mocks for external dependencies
+          - [ ] Test data builders for complex structures
+          EOF
+
+      - name: Upload coverage analysis
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-improvements
+          path: |
+            coverage_improvements.md
+            cover/
+          retention-days: 90
+
+  code_refactoring_suggestions:
+    name: Suggest Refactoring Opportunities
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Analyze refactoring opportunities
+        run: |
+          cat > refactoring_suggestions.md << 'EOF'
+          ## Code Refactoring Opportunities
+
+          ### Duplicate Code Detection
+
+          EOF
+
+          # Simple duplicate detection (can be enhanced with tools)
+          echo "Analyzing for duplicate patterns..." >> refactoring_suggestions.md
+
+          cat >> refactoring_suggestions.md << 'EOF'
+
+          ### Suggested Refactorings
+
+          1. **Extract Function**
+             - Identify code blocks that can be extracted into reusable functions
+             - Look for repeated logic patterns
+
+          2. **Extract Module**
+             - Large modules (>500 lines) should be split
+             - Group related functionality
+
+          3. **Simplify Conditionals**
+             - Use pattern matching instead of nested if/else
+             - Extract complex conditions into named functions
+
+          4. **Introduce Protocols**
+             - Polymorphic behavior can use protocols
+             - Better than case statements on types
+
+          5. **Use Pipe Operator**
+             - Chain function calls with |>
+             - Improves readability
+
+          ### Large Modules to Consider Splitting
+
+          EOF
+
+          # Find large modules
+          for file in $(find lib -name "*.ex"); do
+            lines=$(wc -l < "$file")
+            if [ "$lines" -gt 300 ]; then
+              echo "- $file ($lines lines)" >> refactoring_suggestions.md
+            fi
+          done
+
+      - name: Upload refactoring suggestions
+        uses: actions/upload-artifact@v3
+        with:
+          name: refactoring-suggestions
+          path: refactoring_suggestions.md
+          retention-days: 90
