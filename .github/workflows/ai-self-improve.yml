@@ -1,0 +1,392 @@
+name: AI Self-Improvement
+
+on:
+  workflow_call:
+    inputs:
+      language:
+        description: 'Primary programming language (elixir, python, javascript, etc.)'
+        required: false
+        type: string
+        default: 'auto-detect'
+      improvement_types:
+        description: 'Comma-separated list: code-quality,security,docs,tests,performance,refactor'
+        required: false
+        type: string
+        default: 'code-quality,security,docs,tests'
+      create_issues:
+        description: 'Create GitHub issues for improvements'
+        required: false
+        type: boolean
+        default: true
+      create_pr:
+        description: 'Create PR with automated improvements'
+        required: false
+        type: boolean
+        default: false
+      target_branch:
+        description: 'Branch to analyze and improve'
+        required: false
+        type: string
+        default: 'main'
+      ai_provider:
+        description: 'AI provider to use (anthropic, openai, local)'
+        required: false
+        type: string
+        default: 'anthropic'
+    secrets:
+      ANTHROPIC_API_KEY:
+        description: 'Anthropic API key for Claude'
+        required: false
+      OPENAI_API_KEY:
+        description: 'OpenAI API key'
+        required: false
+      GH_TOKEN:
+        description: 'GitHub token with repo and issue permissions'
+        required: false
+    outputs:
+      improvements_found:
+        description: 'Number of improvements identified'
+        value: ${{ jobs.analyze.outputs.improvements_count }}
+      report_url:
+        description: 'URL to the improvement report'
+        value: ${{ jobs.analyze.outputs.report_url }}
+
+jobs:
+  analyze:
+    name: AI-Powered Analysis
+    runs-on: ubuntu-latest
+    outputs:
+      improvements_count: ${{ steps.analyze.outputs.count }}
+      report_url: ${{ steps.report.outputs.url }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_branch }}
+          fetch-depth: 0
+
+      - name: Detect project language
+        id: detect
+        run: |
+          if [ "${{ inputs.language }}" = "auto-detect" ]; then
+            # Auto-detect based on files present
+            if [ -f "mix.exs" ]; then
+              echo "language=elixir" >> $GITHUB_OUTPUT
+            elif [ -f "package.json" ]; then
+              echo "language=javascript" >> $GITHUB_OUTPUT
+            elif [ -f "requirements.txt" ] || [ -f "pyproject.toml" ]; then
+              echo "language=python" >> $GITHUB_OUTPUT
+            elif [ -f "go.mod" ]; then
+              echo "language=go" >> $GITHUB_OUTPUT
+            elif [ -f "Cargo.toml" ]; then
+              echo "language=rust" >> $GITHUB_OUTPUT
+            else
+              echo "language=unknown" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "language=${{ inputs.language }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup language environment
+        uses: ./.github/actions/setup-environment
+        if: hashFiles('.github/actions/setup-environment/action.yml') != ''
+        continue-on-error: true
+
+      - name: Install AI analysis tools
+        run: |
+          # Install common analysis tools
+          pip install --upgrade pip
+          pip install semgrep bandit radon lizard
+
+          # Language-specific tools
+          case "${{ steps.detect.outputs.language }}" in
+            elixir)
+              echo "Elixir tools will be installed via mix"
+              ;;
+            python)
+              pip install pylint flake8 black mypy safety
+              ;;
+            javascript)
+              npm install -g eslint prettier jscpd
+              ;;
+          esac
+
+      - name: Run static analysis
+        id: static-analysis
+        continue-on-error: true
+        run: |
+          mkdir -p analysis-results
+
+          # Security scanning
+          if [[ "${{ inputs.improvement_types }}" == *"security"* ]]; then
+            echo "Running security scans..."
+            semgrep --config=auto --json --output=analysis-results/semgrep.json . || true
+            bandit -r . -f json -o analysis-results/bandit.json || true
+          fi
+
+          # Code quality
+          if [[ "${{ inputs.improvement_types }}" == *"code-quality"* ]]; then
+            echo "Running code quality analysis..."
+            radon cc . -a -j > analysis-results/complexity.json || true
+            radon mi . -j > analysis-results/maintainability.json || true
+          fi
+
+      - name: Analyze test coverage
+        id: coverage
+        if: contains(inputs.improvement_types, 'tests')
+        continue-on-error: true
+        run: |
+          case "${{ steps.detect.outputs.language }}" in
+            elixir)
+              mix deps.get || true
+              mix test --cover || true
+              ;;
+            python)
+              pip install pytest pytest-cov
+              pytest --cov --cov-report=json || true
+              ;;
+            javascript)
+              npm test -- --coverage --coverageReporters=json || true
+              ;;
+          esac
+
+      - name: AI-powered code analysis
+        id: analyze
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          # Create analysis script
+          cat > ai_analyze.py << 'ANALYZE_EOF'
+          import os
+          import json
+          import subprocess
+          from pathlib import Path
+
+          def analyze_codebase():
+              improvements = []
+
+              # Read static analysis results
+              results_dir = Path("analysis-results")
+              if results_dir.exists():
+                  for result_file in results_dir.glob("*.json"):
+                      try:
+                          with open(result_file) as f:
+                              data = json.load(f)
+                              # Process each type of analysis
+                              if result_file.name == "semgrep.json":
+                                  improvements.extend(process_semgrep(data))
+                              elif result_file.name == "complexity.json":
+                                  improvements.extend(process_complexity(data))
+                      except Exception as e:
+                          print(f"Error processing {result_file}: {e}")
+
+              # Generate improvement recommendations
+              recommendations = {
+                  "total_improvements": len(improvements),
+                  "improvements": improvements,
+                  "priority": categorize_by_priority(improvements)
+              }
+
+              # Save results
+              with open("ai-improvements.json", "w") as f:
+                  json.dump(recommendations, f, indent=2)
+
+              print(f"count={len(improvements)}", flush=True)
+              return recommendations
+
+          def process_semgrep(data):
+              improvements = []
+              if "results" in data:
+                  for finding in data["results"]:
+                      improvements.append({
+                          "type": "security",
+                          "severity": finding.get("extra", {}).get("severity", "warning"),
+                          "message": finding.get("extra", {}).get("message", "Security issue found"),
+                          "file": finding.get("path"),
+                          "line": finding.get("start", {}).get("line"),
+                          "suggestion": finding.get("extra", {}).get("fix", "Review and fix security issue")
+                      })
+              return improvements
+
+          def process_complexity(data):
+              improvements = []
+              for file_path, metrics in data.items():
+                  if isinstance(metrics, list):
+                      for metric in metrics:
+                          if metric.get("complexity", 0) > 10:
+                              improvements.append({
+                                  "type": "code-quality",
+                                  "severity": "warning",
+                                  "message": f"High complexity ({metric['complexity']})",
+                                  "file": file_path,
+                                  "line": metric.get("lineno"),
+                                  "suggestion": "Consider refactoring to reduce complexity"
+                              })
+              return improvements
+
+          def categorize_by_priority(improvements):
+              priority = {"high": [], "medium": [], "low": []}
+              for imp in improvements:
+                  severity = imp.get("severity", "warning")
+                  if severity == "error":
+                      priority["high"].append(imp)
+                  elif severity == "warning":
+                      priority["medium"].append(imp)
+                  else:
+                      priority["low"].append(imp)
+              return priority
+
+          if __name__ == "__main__":
+              analyze_codebase()
+          ANALYZE_EOF
+
+          python ai_analyze.py >> $GITHUB_OUTPUT
+
+      - name: Generate improvement report
+        id: report
+        run: |
+          cat > improvement-report.md << 'REPORT_EOF'
+          # 🤖 AI Self-Improvement Report
+
+          **Repository**: ${{ github.repository }}
+          **Branch**: ${{ inputs.target_branch }}
+          **Date**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+
+          ## Summary
+
+          This automated analysis identified potential improvements across the following categories:
+          - ${{ inputs.improvement_types }}
+
+          ## Findings
+
+          REPORT_EOF
+
+          # Add analysis results to report
+          if [ -f "ai-improvements.json" ]; then
+            python << 'PYTHON_EOF'
+          import json
+
+          with open("ai-improvements.json") as f:
+              data = json.load(f)
+
+          with open("improvement-report.md", "a") as report:
+              report.write(f"\n**Total Improvements Found**: {data['total_improvements']}\n\n")
+
+              for priority in ["high", "medium", "low"]:
+                  items = data["priority"].get(priority, [])
+                  if items:
+                      report.write(f"\n### {priority.capitalize()} Priority ({len(items)} items)\n\n")
+                      for item in items[:10]:  # Limit to first 10 per priority
+                          report.write(f"- **{item['type']}**: {item['message']}\n")
+                          report.write(f"  - File: `{item['file']}`:{item.get('line', 'N/A')}\n")
+                          report.write(f"  - Suggestion: {item['suggestion']}\n\n")
+          PYTHON_EOF
+          fi
+
+          # Upload as artifact
+          echo "Report generated at improvement-report.md"
+          echo "url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_OUTPUT
+
+      - name: Upload analysis artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-improvement-analysis
+          path: |
+            ai-improvements.json
+            improvement-report.md
+            analysis-results/
+          retention-days: 30
+
+      - name: Create improvement issues
+        if: inputs.create_issues && steps.analyze.outputs.count > 0
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -f "ai-improvements.json" ]; then
+            python << 'PYTHON_EOF'
+          import json
+          import subprocess
+          import os
+
+          with open("ai-improvements.json") as f:
+              data = json.load(f)
+
+          # Create issues for high priority items
+          for item in data["priority"].get("high", [])[:5]:  # Max 5 issues
+              title = f"[AI] {item['type']}: {item['message']}"
+              body = f"""
+          ## AI-Detected Improvement
+
+          **Type**: {item['type']}
+          **Severity**: {item['severity']}
+          **File**: `{item['file']}`:{item.get('line', 'N/A')}
+
+          ### Issue
+          {item['message']}
+
+          ### Suggested Fix
+          {item['suggestion']}
+
+          ---
+          *This issue was automatically created by the AI Self-Improvement workflow*
+          """
+
+              # Create issue using gh CLI
+              result = subprocess.run(
+                  ["gh", "issue", "create", "--title", title, "--body", body, "--label", "ai-improvement"],
+                  capture_output=True,
+                  text=True
+              )
+
+              if result.returncode == 0:
+                  print(f"Created issue: {title}")
+              else:
+                  print(f"Failed to create issue: {result.stderr}")
+          PYTHON_EOF
+          fi
+
+      - name: Create improvement PR
+        if: inputs.create_pr && steps.analyze.outputs.count > 0
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          # Create a new branch for improvements
+          BRANCH_NAME="ai-improvements-$(date +%Y%m%d-%H%M%S)"
+          git checkout -b "$BRANCH_NAME"
+
+          # Apply automated fixes (if any)
+          echo "Automated fixes would be applied here"
+          # Future: Integrate with language-specific auto-fixers
+
+          # If changes were made, create PR
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "AI Improvement Bot"
+            git config user.email "ai-bot@github.com"
+            git add .
+            git commit -m "🤖 Apply AI-suggested improvements"
+            git push -u origin "$BRANCH_NAME"
+
+            gh pr create \
+              --title "🤖 AI-Suggested Improvements" \
+              --body "$(cat improvement-report.md)" \
+              --label "ai-improvement" \
+              --base "${{ inputs.target_branch }}"
+          fi
+
+  notify:
+    name: Notification
+    runs-on: ubuntu-latest
+    needs: analyze
+    if: always()
+
+    steps:
+      - name: Summary
+        run: |
+          echo "### 🤖 AI Self-Improvement Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Improvements Found**: ${{ needs.analyze.outputs.improvements_count }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Report**: ${{ needs.analyze.outputs.report_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Check the workflow artifacts for detailed analysis results." >> $GITHUB_STEP_SUMMARY
