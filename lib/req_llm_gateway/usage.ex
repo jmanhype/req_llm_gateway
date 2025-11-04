@@ -50,6 +50,7 @@ defmodule ReqLLMGateway.Usage do
   - `usage` - Map with "prompt_tokens", "completion_tokens", "total_tokens", and optionally "cost_usd"
   - `latency_ms` - Request latency in milliseconds
   """
+  @spec record(String.t(), String.t(), map(), integer()) :: :ok
   def record(provider, model, usage, latency_ms) do
     date = Date.utc_today()
     key = {date, provider, model}
@@ -95,6 +96,7 @@ defmodule ReqLLMGateway.Usage do
   @doc """
   Gets all usage records as a list of maps.
   """
+  @spec get_all() :: [map()]
   def get_all do
     @table_name
     |> :ets.tab2list()
@@ -105,6 +107,7 @@ defmodule ReqLLMGateway.Usage do
   @doc """
   Gets usage records for a specific date.
   """
+  @spec get_by_date(Date.t()) :: [map()]
   def get_by_date(date) do
     @table_name
     |> :ets.match_object({{date, :_, :_}, :_, :_, :_, :_, :_, :_})
@@ -114,6 +117,7 @@ defmodule ReqLLMGateway.Usage do
   @doc """
   Gets usage records for a specific provider.
   """
+  @spec get_by_provider(String.t()) :: [map()]
   def get_by_provider(provider) do
     @table_name
     |> :ets.match_object({{:_, provider, :_}, :_, :_, :_, :_, :_, :_})
@@ -123,6 +127,7 @@ defmodule ReqLLMGateway.Usage do
   @doc """
   Clears all usage data.
   """
+  @spec clear_all() :: :ok
   def clear_all do
     :ets.delete_all_objects(@table_name)
     :ok
