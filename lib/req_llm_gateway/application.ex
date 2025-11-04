@@ -9,6 +9,9 @@ defmodule ReqLLMGateway.Application do
       # Start the Usage ETS table
       ReqLLMGateway.Usage,
 
+      # Start the AutoOptimizer for AI-driven self-improvement
+      {ReqLLMGateway.AutoOptimizer, []},
+
       # Start telemetry poller
       {:telemetry_poller, measurements: periodic_measurements(), period: 10_000},
 

@@ -18,6 +18,7 @@ That's it. You now have a production-ready LLM gateway.
 - ✅ **Usage tracking** - ETS-backed stats (no database needed)
 - ✅ **Automatic cost tracking** - ReqLLM knows pricing for all models
 - ✅ **LiveDashboard** - See usage stats at `/dashboard/req_llm`
+- ✨ **AI Self-Improvement** - Automated optimization recommendations
 
 ## Installation
 
@@ -62,10 +63,11 @@ scope "/v1" do
   forward "/chat/completions", ReqLLMGateway.Plug
 end
 
-# Add LiveDashboard page
+# Add LiveDashboard pages
 live_dashboard "/dashboard",
   additional_pages: [
-    req_llm: ReqLLMGateway.LiveDashboard
+    req_llm: ReqLLMGateway.LiveDashboard,
+    optimizer: ReqLLMGateway.LiveDashboardOptimizer
   ]
 ```
 
@@ -146,7 +148,17 @@ config :req_llm_gateway,
   include_extensions: true,
 
   # Optional gateway authentication
-  api_key: System.get_env("GATEWAY_API_KEY")
+  api_key: System.get_env("GATEWAY_API_KEY"),
+
+  # AutoOptimizer configuration
+  auto_optimizer: [
+    enabled: true,                    # Enable AI self-improvement
+    analysis_interval: 3600,          # Run analysis every hour (in seconds)
+    keep_history_days: 30,            # Keep 30 days of data
+    cost_threshold_percent: 10,       # Alert if cost changes by >10%
+    error_threshold_percent: 5,       # Alert if error rate > 5%
+    min_samples_for_analysis: 50      # Minimum samples before analyzing
+  ]
 
 # ReqLLM provider API keys
 config :req_llm,
@@ -176,6 +188,84 @@ ReqLLMGateway.Usage.get_all()
 ```
 
 Or view in LiveDashboard at `/dashboard/req_llm`.
+
+## AI Self-Improvement Automation
+
+ReqLLMGateway includes an intelligent AutoOptimizer that continuously analyzes your usage patterns and provides actionable recommendations to reduce costs, improve performance, and increase reliability.
+
+### Features
+
+**Cost Optimization**
+- Identifies expensive providers and suggests cheaper alternatives
+- Calculates potential savings and ROI
+- Tracks cost trends over time
+
+**Performance Analysis**
+- Monitors latency across providers
+- Detects performance degradation
+- Identifies inconsistent response times
+
+**Reliability Monitoring**
+- Tracks usage distribution
+- Identifies underutilized providers
+- Detects anomalies in usage patterns
+
+### Accessing Recommendations
+
+**View in LiveDashboard:**
+```
+http://localhost:4000/dashboard/optimizer
+```
+
+**Programmatic access:**
+```elixir
+# Get all recommendations
+ReqLLMGateway.AutoOptimizer.get_recommendations()
+
+# Get cost optimization opportunities
+ReqLLMGateway.AutoOptimizer.analyze_cost_opportunities()
+
+# Generate daily report
+ReqLLMGateway.AutoOptimizer.generate_daily_report()
+
+# Get provider recommendation for a model
+ReqLLMGateway.AutoOptimizer.recommend_provider("gpt-4", %{max_latency_ms: 500})
+
+# Find cheaper model alternatives
+ReqLLMGateway.AutoOptimizer.get_model_alternatives("openai", "gpt-4")
+```
+
+### How It Works
+
+1. **Continuous Learning**: AutoOptimizer runs periodic analysis (configurable interval)
+2. **Pattern Detection**: Analyzes usage data from the ETS-backed tracking system
+3. **Smart Recommendations**: Generates prioritized suggestions based on:
+   - Cost per 1K tokens across providers
+   - Latency percentiles (p50, p95, p99)
+   - Usage distribution and trends
+4. **Actionable Insights**: Each recommendation includes:
+   - Priority level (Critical, High, Medium, Low)
+   - Impact estimate (cost savings, latency reduction)
+   - Specific actions to take
+
+### Configuration
+
+```elixir
+config :req_llm_gateway,
+  auto_optimizer: [
+    enabled: true,                    # Turn on/off auto-optimization
+    analysis_interval: 3600,          # How often to analyze (seconds)
+    min_samples_for_analysis: 50      # Min requests before recommendations
+  ]
+```
+
+### Manual Analysis
+
+Trigger analysis on-demand:
+
+```elixir
+ReqLLMGateway.AutoOptimizer.run_analysis()
+```
 
 ## Telemetry
 
