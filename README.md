@@ -14,6 +14,7 @@ That's it. You now have a production-ready LLM gateway.
 - ✅ **OpenAI-compatible endpoint** - Works with existing SDKs (Python, JS, curl)
 - ✅ **45+ providers, 665+ models** - Powered by ReqLLM
 - ✅ **Multi-provider routing** - `openai:gpt-4`, `anthropic:claude-3-sonnet`, `google:gemini-pro`
+- ✅ **Production-ready security** - Rate limiting, error sanitization, configurable CORS
 - ✅ **Built-in telemetry** - Emit events for observability
 - ✅ **Usage tracking** - ETS-backed stats (no database needed)
 - ✅ **Automatic cost tracking** - ReqLLM knows pricing for all models
@@ -146,7 +147,16 @@ config :req_llm_gateway,
   include_extensions: true,
 
   # Optional gateway authentication
-  api_key: System.get_env("GATEWAY_API_KEY")
+  api_key: System.get_env("GATEWAY_API_KEY"),
+
+  # Rate limiting: {max_requests, time_window_ms} (default: {100, 60_000})
+  rate_limit: {100, 60_000},  # 100 requests per minute
+
+  # CORS origins (default: "*" for dev, set specific origins for production)
+  cors_origins: ["https://yourdomain.com"],  # or "*" or "https://app.com"
+
+  # Error verbosity: :detailed (dev) or :sanitized (prod) (default: :sanitized)
+  error_verbosity: :sanitized
 
 # ReqLLM provider API keys
 config :req_llm,
@@ -207,11 +217,18 @@ Add it to your Phoenix app and you have a production-ready LLM gateway with tele
 
 **Heads will explode.** 🤯
 
-## MVP Limitations
+## Security Features
+
+- ✅ **Rate limiting** - Built-in protection against abuse (100 req/min default)
+- ✅ **Error sanitization** - Production mode prevents information disclosure
+- ✅ **Configurable CORS** - Set allowed origins for your production environment
+- ✅ **Atom exhaustion protection** - Safe parameter handling prevents DoS attacks
+- ✅ **Optional authentication** - Add API key requirement via config
+
+## Current Limitations
 
 - **No streaming** - `stream: true` returns an error (coming soon)
 - **No persistence** - Usage data is in-memory (restart = reset)
-- **No rate limiting** - Add a reverse proxy if needed
 
 ## License
 
