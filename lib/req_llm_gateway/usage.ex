@@ -87,21 +87,38 @@ defmodule ReqLLMGateway.Usage do
     )
 
     :ok
-  rescue
-    error ->
-      Logger.error("Failed to record usage: #{inspect(error)}")
-      :ok
   end
 
   @doc """
-  Gets all usage records as a list of maps.
+  Gets usage records as a list of maps.
+
+  ## Options
+
+  - `:limit` - Maximum number of records to return (default: `:all`)
+
+  ## Examples
+
+      iex> ReqLLMGateway.Usage.get_all(limit: 100)
+      [%{date: ~D[2024-01-15], ...}, ...]
+
+      iex> ReqLLMGateway.Usage.get_all()  # Returns all records
+      [...]
   """
-  @spec get_all() :: [map()]
-  def get_all do
-    @table_name
-    |> :ets.tab2list()
-    |> Enum.map(&format_record/1)
-    |> Enum.sort_by(fn r -> {r.date, r.provider, r.model} end, :desc)
+  @spec get_all(keyword()) :: [map()]
+  def get_all(opts \\ []) do
+    limit = Keyword.get(opts, :limit, :all)
+
+    records =
+      @table_name
+      |> :ets.tab2list()
+      |> Enum.map(&format_record/1)
+      |> Enum.sort_by(fn r -> {r.date, r.provider, r.model} end, :desc)
+
+    case limit do
+      :all -> records
+      n when is_integer(n) and n > 0 -> Enum.take(records, n)
+      _ -> records
+    end
   end
 
   @doc """

@@ -66,6 +66,19 @@ defmodule ReqLLMGateway.LLMClient do
 
   @behaviour __MODULE__
 
+  # Allowed custom parameters that can be safely converted to atoms
+  # This prevents atom table exhaustion from malicious user input
+  @allowed_custom_params [
+    :tool_choice,
+    :tools,
+    :response_format,
+    :logprobs,
+    :top_logprobs,
+    :logit_bias,
+    :seed,
+    :n
+  ]
+
   @impl true
   def chat_completion(provider, model, request) do
     # Validate request inputs
@@ -175,8 +188,7 @@ defmodule ReqLLMGateway.LLMClient do
       "stop", "stream", "user"
     ])
 
-    # Fix: Convert string keys to atoms for custom parameters
-    # Use a safer approach that doesn't drop all params on error
+    # Convert custom parameters using allowlist to prevent atom table exhaustion
     if map_size(custom_params) > 0 do
       custom_opts =
         custom_params
@@ -185,11 +197,17 @@ defmodule ReqLLMGateway.LLMClient do
           if is_nil(value) do
             acc
           else
-            # Safely convert string keys to atoms
-            case safe_to_atom(key) do
-              {:ok, atom_key} -> [{atom_key, value} | acc]
+            # Only convert known, safe parameters to atoms
+            case safe_string_to_atom(key) do
+              {:ok, atom_key} when atom_key in @allowed_custom_params ->
+                [{atom_key, value} | acc]
+
+              {:ok, _atom_key} ->
+                Logger.warning("Ignoring unknown custom parameter: #{inspect(key)}")
+                acc
+
               :error ->
-                Logger.warn("Skipping custom parameter with invalid key: #{inspect(key)}")
+                Logger.warning("Skipping custom parameter with invalid key format: #{inspect(key)}")
                 acc
             end
           end
@@ -201,23 +219,21 @@ defmodule ReqLLMGateway.LLMClient do
     end
   end
 
-  # Safely convert string to existing atom, or create new atom if reasonable
-  defp safe_to_atom(key) when is_atom(key), do: {:ok, key}
-  defp safe_to_atom(key) when is_binary(key) do
-    # Try existing atom first
+  # Safely convert string to existing atom only (prevents atom table exhaustion)
+  # This function will NOT create new atoms, making it safe from DoS attacks
+  defp safe_string_to_atom(key) when is_atom(key), do: {:ok, key}
+
+  defp safe_string_to_atom(key) when is_binary(key) do
     try do
       {:ok, String.to_existing_atom(key)}
     rescue
       ArgumentError ->
-        # Only create new atoms for reasonable key names (alphanumeric + underscore)
-        if String.match?(key, ~r/^[a-z_][a-z0-9_]*$/i) and byte_size(key) < 100 do
-          {:ok, String.to_atom(key)}
-        else
-          :error
-        end
+        # Never create new atoms - this prevents atom table exhaustion attacks
+        :error
     end
   end
-  defp safe_to_atom(_), do: :error
+
+  defp safe_string_to_atom(_), do: :error
 
   defp maybe_add_option(opts, _key, nil), do: opts
   defp maybe_add_option(opts, key, value), do: Keyword.put(opts, key, value)
@@ -253,7 +269,7 @@ defmodule ReqLLMGateway.LLMClient do
 
       # Fallback: Try to extract any text-like field
       other ->
-        Logger.warn("Unexpected response format from #{provider}",
+        Logger.warning("Unexpected response format from #{provider}",
           provider: provider,
           model: model,
           response_keys: Map.keys(other)
@@ -440,7 +456,7 @@ defmodule ReqLLMGateway.LLMClient do
 
     # Log warning if we encountered non-text content blocks
     if unhandled != [] do
-      Logger.warn("Encountered non-text content blocks",
+      Logger.warning("Encountered non-text content blocks",
         unhandled_types: Enum.map(unhandled, &Map.get(&1, "type", "unknown"))
       )
     end
@@ -463,9 +479,8 @@ defmodule ReqLLMGateway.LLMClient do
   defp map_finish_reason(_), do: "stop"
 
   # Transform ReqLLM errors to OpenAI-compatible format
-  # Enhanced to preserve error types from ReqLLM.Error structs
-  # Use idiomatic struct pattern matching
-  defp transform_error(%ReqLLM.Error{type: type, message: message}, provider, model) do
+  # Enhanced to preserve error types from various error formats
+  defp transform_error(%{__struct__: _, type: type, message: message}, provider, model) when is_atom(type) do
     Logger.error("ReqLLM error",
       provider: provider,
       model: model,
@@ -518,7 +533,7 @@ defmodule ReqLLMGateway.LLMClient do
   end
 
   # Helper to get error type for logging
-  defp error_type(%ReqLLM.Error{type: type}), do: type
+  defp error_type(%{__struct__: _, type: type}), do: type
   defp error_type(%{type: type}), do: type
   defp error_type(_), do: :unknown
 

@@ -1,17 +1,7 @@
 defmodule ReqLLMGateway.LiveDashboard do
   @moduledoc """
   LiveDashboard page for viewing usage statistics.
-
-  ## Usage
-
-  Add to your Phoenix endpoint's LiveDashboard:
-
-      live_dashboard "/dashboard",
-        additional_pages: [
-          req_llm: ReqLLMGateway.LiveDashboard
-        ]
   """
-
   use Phoenix.LiveDashboard.PageBuilder
 
   @impl true
@@ -20,104 +10,59 @@ defmodule ReqLLMGateway.LiveDashboard do
   end
 
   @impl true
-  def render_page(_assigns) do
-    table(
-      columns: table_columns(),
-      id: :usage_table,
-      row_attrs: &row_attrs/1,
-      row_fetcher: &fetch_usage/2,
-      rows_name: "usage records",
-      title: "LLM Gateway Usage"
-    )
+  def render(assigns) do
+    ~H"""
+    <div>
+      <h5 class="card-title">LLM Gateway Usage</h5>
+      <div class="card tabular-card mb-4 mt-4">
+        <div class="card-body p-0">
+          <div class="dash-table-wrapper">
+            <%= render_table(assigns) %>
+          </div>
+        </div>
+      </div>
+    </div>
+    """
   end
 
-  defp table_columns do
-    [
-      %{
-        field: :date,
-        header: "Date",
-        format: &format_date/1
-      },
-      %{
-        field: :provider,
-        header: "Provider"
-      },
-      %{
-        field: :model,
-        header: "Model"
-      },
-      %{
-        field: :calls,
-        header: "Calls",
-        header_attrs: [class: "text-right"],
-        cell_attrs: [class: "tabular-nums text-right"]
-      },
-      %{
-        field: :prompt_tokens,
-        header: "Prompt Tokens",
-        header_attrs: [class: "text-right"],
-        cell_attrs: [class: "tabular-nums text-right"],
-        format: &format_number/1
-      },
-      %{
-        field: :completion_tokens,
-        header: "Completion Tokens",
-        header_attrs: [class: "text-right"],
-        cell_attrs: [class: "tabular-nums text-right"],
-        format: &format_number/1
-      },
-      %{
-        field: :total_tokens,
-        header: "Total Tokens",
-        header_attrs: [class: "text-right"],
-        cell_attrs: [class: "tabular-nums text-right"],
-        format: &format_number/1
-      },
-      %{
-        field: :cost_usd,
-        header: "Cost (USD)",
-        header_attrs: [class: "text-right"],
-        cell_attrs: [class: "tabular-nums text-right"],
-        format: &format_cost/1
-      },
-      %{
-        field: :avg_latency_ms,
-        header: "Avg Latency (ms)",
-        header_attrs: [class: "text-right"],
-        cell_attrs: [class: "tabular-nums text-right"]
-      }
-    ]
+  defp render_table(assigns) do
+    # Limit to 200 most recent records to prevent memory exhaustion
+    # For full history, export data via API or database
+    assigns = assign(assigns, :records, ReqLLMGateway.Usage.get_all(limit: 200))
+
+    ~H"""
+    <table class="table table-hover mt-0 mb-0">
+      <thead>
+        <tr>
+          <th class="pl-4">Date</th>
+          <th>Provider</th>
+          <th>Model</th>
+          <th class="text-right">Calls</th>
+          <th class="text-right">Prompt Tokens</th>
+          <th class="text-right">Completion Tokens</th>
+          <th class="text-right">Total Tokens</th>
+          <th class="text-right">Cost (USD)</th>
+          <th class="text-right pr-4">Avg Latency (ms)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <%= for record <- @records do %>
+          <tr>
+            <td class="tabular-column-name pl-4"><%= Date.to_string(record.date) %></td>
+            <td class="tabular-column-name"><%= record.provider %></td>
+            <td class="tabular-column-name"><%= record.model %></td>
+            <td class="tabular-column-value text-right"><%= record.calls %></td>
+            <td class="tabular-column-value text-right"><%= format_number(record.prompt_tokens) %></td>
+            <td class="tabular-column-value text-right"><%= format_number(record.completion_tokens) %></td>
+            <td class="tabular-column-value text-right"><%= format_number(record.total_tokens) %></td>
+            <td class="tabular-column-value text-right"><%= format_cost(record.cost_usd) %></td>
+            <td class="tabular-column-value text-right pr-4"><%= record.avg_latency_ms %>ms</td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+    """
   end
-
-  defp fetch_usage(params, _node) do
-    %{sort_by: sort_by, sort_dir: sort_dir, limit: limit} = params
-
-    records = ReqLLMGateway.Usage.get_all()
-
-    # Sort
-    sorted =
-      Enum.sort_by(
-        records,
-        &Map.get(&1, sort_by),
-        if(sort_dir == :desc, do: :desc, else: :asc)
-      )
-
-    # Paginate
-    paginated = Enum.take(sorted, limit)
-
-    {paginated, length(records)}
-  end
-
-  defp row_attrs(record) do
-    [
-      {"phx-click", "show_details"},
-      {"phx-value-date", to_string(record.date)},
-      {"phx-value-provider", record.provider},
-      {"phx-value-model", record.model}
-    ]
-  end
-
-  defp format_date(date), do: Date.to_string(date)
 
   defp format_number(num) when is_integer(num) do
     num
@@ -127,10 +72,8 @@ defmodule ReqLLMGateway.LiveDashboard do
     |> String.reverse()
   end
 
-  defp format_number(num), do: to_string(num)
-
-  defp format_cost(cost) when is_float(cost) or is_integer(cost) do
-    "$#{:erlang.float_to_binary(cost * 1.0, decimals: 6)}"
+  defp format_cost(cost) when is_float(cost) do
+    "$#{:erlang.float_to_binary(cost, decimals: 6)}"
   end
 
   defp format_cost(_), do: "$0.000000"
