@@ -53,6 +53,7 @@ defmodule ReqLLMGateway.Pricing do
 
   Returns `nil` if the model pricing is not found or if token counts are invalid.
   """
+  @spec calculate(String.t(), map()) :: float() | nil
   def calculate(model, usage) when is_map(usage) do
     pricing = get_pricing()
 
@@ -73,6 +74,7 @@ defmodule ReqLLMGateway.Pricing do
   @doc """
   Returns the pricing table for all models.
   """
+  @spec get_pricing() :: %{String.t() => %{input: float(), output: float()}}
   def get_pricing do
     Application.get_env(:req_llm_gateway, :pricing, @default_pricing)
   end
@@ -83,6 +85,7 @@ defmodule ReqLLMGateway.Pricing do
   Returns a map with :input and :output keys (prices per million tokens),
   or nil if not found.
   """
+  @spec get_model_pricing(String.t()) :: %{input: float(), output: float()} | nil
   def get_model_pricing(model) do
     get_pricing()[model]
   end
@@ -90,6 +93,7 @@ defmodule ReqLLMGateway.Pricing do
   @doc """
   Sets custom pricing for a model at runtime.
   """
+  @spec set_model_pricing(String.t(), float(), float()) :: :ok
   def set_model_pricing(model, input_price, output_price) do
     current = get_pricing()
     updated = Map.put(current, model, %{input: input_price, output: output_price})

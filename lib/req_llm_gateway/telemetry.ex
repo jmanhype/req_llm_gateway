@@ -17,6 +17,7 @@ defmodule ReqLLMGateway.Telemetry do
     - Metadata: `%{error: string}`
   """
 
+  @spec emit_start(String.t(), String.t()) :: :ok
   def emit_start(provider, model) do
     :telemetry.execute(
       [:req_llm_gateway, :request, :start],
@@ -31,6 +32,7 @@ defmodule ReqLLMGateway.Telemetry do
   The duration is emitted in :native time units and converted to milliseconds
   by the metrics reporters using the unit: {:native, :millisecond} option.
   """
+  @spec emit_stop(map(), map(), String.t(), integer()) :: :ok
   def emit_stop(request, response, provider, duration_native) do
     usage = Map.get(response, "usage", %{})
 
@@ -50,6 +52,7 @@ defmodule ReqLLMGateway.Telemetry do
     )
   end
 
+  @spec emit_exception(any()) :: :ok
   def emit_exception(error) do
     :telemetry.execute(
       [:req_llm_gateway, :request, :exception],
@@ -64,6 +67,7 @@ defmodule ReqLLMGateway.Telemetry do
   These metrics are designed to work with TelemetryMetrics reporters like
   TelemetryMetrics.ConsoleReporter or Prometheus.
   """
+  @spec metrics() :: [Telemetry.Metrics.t()]
   def metrics do
     [
       # Request counters

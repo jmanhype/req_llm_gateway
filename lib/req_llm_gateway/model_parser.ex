@@ -23,20 +23,19 @@ defmodule ReqLLMGateway.ModelParser do
       {:error, %{type: "invalid_request_error", message: "Model cannot be empty", code: "invalid_model"}}
   """
 
-  @default_provider Application.compile_env(:req_llm_gateway, :default_provider, "openai")
-
   @doc """
   Parses a model string into provider and model components.
 
   Returns `{:ok, provider, model}` on success or `{:error, error_map}` on failure.
   """
+  @spec parse(String.t() | any()) :: {:ok, String.t(), String.t()} | {:error, map()}
   def parse(model) when is_binary(model) and byte_size(model) > 0 do
     case String.split(model, ":", parts: 2) do
       [provider, model_name] when byte_size(model_name) > 0 ->
         {:ok, provider, model_name}
 
       [model_name] ->
-        {:ok, @default_provider, model_name}
+        {:ok, get_default_provider(), model_name}
 
       _ ->
         {:error,
@@ -55,5 +54,11 @@ defmodule ReqLLMGateway.ModelParser do
        message: "Model cannot be empty",
        code: "invalid_model"
      }}
+  end
+
+  # Get default provider from runtime config (not compile-time)
+  # This allows users to configure it at runtime
+  defp get_default_provider do
+    Application.get_env(:req_llm_gateway, :default_provider, "openai")
   end
 end
