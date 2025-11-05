@@ -63,6 +63,7 @@ defmodule ReqLLMGateway.MixProject do
       {:phoenix_live_dashboard, "~> 0.8"},
       {:req_llm, "~> 1.0.0-rc.6"},
       {:decimal, "~> 2.1"},
+      {:hammer, "~> 6.1"},
 
       # Development dependencies
       {:ex_doc, "~> 0.31", only: :dev, runtime: false},
