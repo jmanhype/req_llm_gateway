@@ -22,5 +22,9 @@ config :req_llm_gateway,
     "anthropic" => System.get_env("ANTHROPIC_API_KEY")
   }
 
+# Hammer rate limiting backend configuration
+config :hammer,
+  backend: {Hammer.Backend.ETS, [expiry_ms: 60_000 * 60 * 2, cleanup_interval_ms: 60_000 * 10]}
+
 # Import environment-specific config
 import_config "#{config_env()}.exs"
